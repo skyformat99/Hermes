@@ -1,0 +1,6 @@
+[submodule "libs/protobuf"]
+	path = libs/protobuf
+	url = https://github.com/google/protobuf.git
+[submodule "libs/asio"]
+	path = libs/asio
+	url = https://github.com/chriskohlhoff/asio.git
