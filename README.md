@@ -2,7 +2,7 @@ Hermes version 1.0
 
 # Welcome to Hermes :)
 
-## Hermes.
+## Hermes
 
 > _Hermes is an Olympian god in Greek religion and mythology, he is described
 as quick and cunning._
@@ -21,7 +21,7 @@ You will find all Hermes features in the documentation, as below.
 > **WARNING**: this repository is being actively developed.
 
 
-## Documentation.
+## Documentation
 
 [`Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md) Here, you will find a full commented documentation, including usage examples. It is quite a good start to discover all features offered by Hermes and to have a first overview.
 
@@ -30,8 +30,11 @@ You will find all Hermes features in the documentation, as below.
 
 - Travis: [![Build Status](https://travis-ci.org/TommyStarK/Hermes.svg?branch=master)](https://travis-ci.org/TommyStarK/Hermes)
 
+## Just a word
 
-## Contribution.
+I just want to write a few words to explain what Hermes means to me. All along my studies, i had to use socket in various programs with different protocol. Few weeks ago, i told myself "if i create a user-friendly library based asio in wich there would be the most famous serialization protocol implemented... Does students will use it and like it ?" That's why i started Hermes, to offer people a simple and easy way to use those serialization protocols and communicate through socket. I really have no other claims.
+
+## Contribution
 
 Each Contribution is welcomed and encouraged. We do not claim to cover each use cases nor completely master the c++. If you encounter a non sense or any trouble, you can open an issue
 and we will be happy to discuss about it.
