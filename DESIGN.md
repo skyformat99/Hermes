@@ -32,6 +32,8 @@ One more thing, as you should know, using protobuf needs to have defined a .prot
 {
   #include "Hermes.hpp"
 
+  #include <string>
+  #include <memory>
   #include <iostream>
 
   using namespace Hermes;
