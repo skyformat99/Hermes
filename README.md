@@ -1,6 +1,8 @@
 Hermes version 1.0
 
+
 # Welcome to Hermes :)
+
 
 ## Hermes
 
@@ -11,31 +13,66 @@ as quick and cunning._
 
 > _Hermes suffers from no limit. He loves to outwit other gods for his own satisfaction or for the sake of humankind._
 
-Hermes is an attempt to define a new communication protocol based on [`Google protocol buffer`](https://github.com/google/protobuf) and [`Asio`](http://think-async.com/Asio).
 
-In addition to being a new and easy way to see communication through sockets, Hermes, in his greatness, allows his users to be able to create `messengers`. Those entities could represent
-any network software, and are pretty simple to use.
+#### What is it ?
 
-You will find all Hermes features in the documentation, as below.
+Hermes is an attempt to provide all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [![Asio]( http://think-async.com/Asio
+)] which is a cross-platform C++ library for network.
+In order to meet user's wishes, Hermes is able to handle some famous serialization protocols and thus can be used in various kind of c++ program wherein network communication is needed.
+As i said, Hermes has been designed to be pretty simple to use, you will need to write only a few lines to do what you want.
 
-> **WARNING**: this repository is being actively developed.
+
+#### Features & Usefulness
+
+- network:
+  As Hermes is based on Asio, Hermes could not only provide network software (client, server),
+  but he is supporting TCP, UDP and could easily do asynchronous operations thanks to Asio's asynchronous model.
+
+- serialization:
+  When we thought about serialization we knew we had to implement into Hermes the awesome
+  Google serialization protocols
+  - [![protobuf](https://github.com/google/protobuf.git)]
+  - [![flatbuffer](https://github.com/google/flatbuffers.git)]
+  - binary.
+
+
+## Requirements
+- c++11
+
+The following dependencies are required to use all Hermes features but they are included into Hermes repository if you do not have them.
+- Asio without-boost
+- Google Protocol Buffers
+- Google FlatBuffers
+
+## Compiling
+The library is header only, so there is nothing to build and to link with your program.
+
+to download Hermes:
+
+```bash
+  git clone --recursive https://github.com/TommyStarK/Hermes.git
+```
 
 
 ## Documentation
 
-[`Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md) Here, you will find a full commented documentation, including usage examples. It is quite a good start to discover all features offered by Hermes and to have a first overview.
+You will find a full commmented documentation, including various simple examples, here [`Hermes Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md).
 
 
 ## Build status
 
 - Travis: [![Build Status](https://travis-ci.org/TommyStarK/Hermes.svg?branch=master)](https://travis-ci.org/TommyStarK/Hermes)
 
-## Just a word
-
-I just want to write a few words to explain what Hermes means to me. All along my studies, i had to use socket in various programs with different protocol. Few weeks ago, i told myself "if i create a user-friendly library based asio in wich there would be the most famous serialization protocol implemented... Does students will use it and like it ?" That's why i started Hermes, to offer people a simple and easy way to use those serialization protocols and communicate through socket. I really have no other claims.
 
 ## Contribution
 
 Each Contribution is welcomed and encouraged. We do not claim to cover each use cases nor completely master the c++. If you encounter a non sense or any trouble, you can open an issue
-and we will be happy to discuss about it.
-Do not hesitate to open issue, if you would like to see a specific feature.
+and we will be happy to discuss about it. Do not hesitate to open an issue, if you would like to see a specific feature.
+
+
+## Thanks
+
+Thanks to my mate and friend [![Manu](https://github.com/chambo-e)] for the original idea :)
+
+
+> **WARNING**: this repository is being actively developed. It is farm from being stable.

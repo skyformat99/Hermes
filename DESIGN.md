@@ -1,44 +1,71 @@
 # Hermes design
 
-In this document, we will define each feature of Hermes. We will describe how to use it. First of all, we will talk about how to use google protocol buffer with Hermes. Then, we will do an overview of messengers, how to create them, and how to use them.
+In this document, we will define each feature of Hermes. We will describe how to use it.
+Let's begin with an overview of Hermes design.
 
-## Hermes and protobuf
+Hermes has two different parts:
+- Messenger:
+    A global entity which allows you to create various network softwares. Each messenger has his own methods to do the job. Messenger could do asynchronous operations. By operations i mean, connect or accept a socket, send and receive data, execute callbacks, handle disconnect etc.
 
-So, let's begin the first part of this documentation. How to send a google protocol buffer with Hermes ? As i said, Hermes has been designed to be pretty simple to use and could handle nativly some of the most famous serialization protocol.
+- Serialization:
+    Hermes is a fast and easy way to send/receive serialized data through socket.
+    You will find various namespaces into Hermes, they are here to separate the differents serialization protocols, respectively 'protobuf', 'flatbuffer' and 'binary'.
 
-The only task that the user has to do, it's to define his own model of google protocol buffer.
 
-We will assume that we have define a protobuf package named 'pkg' wich contains a model message named 'msg'. These two names are here to make the following example more understandable.
+## Serialization
 
+The purpose of Hermes serialization part is to provide a really simple use of sending/receiving serialized data. You just have to write a single line to send/receive a serialized object (only to send and receive not to create the object itself or to set its data).
+
+#### protobuf
+
+Google Protocol Buffers are a language-neutral, platform-neutral, mechanism for serializing structured data.
+Here, i want to point the 'structured data', that means we clearly have to use a communication protocol which allows us to be sure to get all data and in the right order. Without this, it will be impossible to unserialize object and get data back.
+So for obvious reasons, Hermes network operations about protobuf will always use TCP protocol.
+
+One more thing, as you should know, using protobuf needs to have defined a .proto model and generate according classes. So let's assume that our protobuf package is name 'package' and our message model named 'msg'.I know i'm quite imaginative :)
+
+  if you need help about using protobuf : [![Google Protocol Buffers doc](https://developers.google.com/protocol-buffers/?hl=en)]
+
+- Example: Synchronous sending/receiving protobuf object.
 
 ```c++
 {
-  // Hermes is a header-only library.
   #include "Hermes.hpp"
+
+  #include <iostream>
 
   using namespace Hermes;
 
+  // Here the following prototypes in Hermes::protobuf, the template T represents your protobuf
+  // message model, in our example package::message. Function send returns number of bytes sent.
+  template<typename T>
+  std::size_t send(const std::string& host, const std::string& port, T* message);
 
-  // here i declare a new protobuf object
-  auto message = new pkg::msg;
-
-
-
-  // First we want to send our object 'message'.
-  // The 'send' function in namespace 'protobuf' takes 3 parameters: host, port and a pointer on
-  // message.
-  // The 'send' function serializes the object to a string and send it to the given host through
-  // a tcp socket.
-  // As you can see, this function is templated so you can send any kind of protobuf.
+  // receive returns a pointer to an object of type T created by parsing the string received
+  // through TCP socket. This string is a protobuf object serialized.
+  template<typename T>
+  T* receive(const std::string& port);
 
 
-  protobuf::send<pkg::msg>("127.0.0.1", "1234", message);
+  // we start by declaring our protobuf object
+  auto protobuf_object = new package::msg;
+
+  // Once we have set the according data which want to be sent. we call the send function.
+  // In case of error, 0 is returned.
+  auto error = protobuf::send<package::message>("127.0.0.1", "8080", protobuf_object);
 
 
-  // Respectively, the 'receive' function allows you to receive a string wich represents
-  // a serialized protobuf and return the object created from the parsing of this string.
+  if (not error)
+    std::cerr << "Error :(" << std::endl;
+  else
+    std::cout << "Message sent :)" << std::endl;
 
-  auto response = protobuf::receive<pkg::msg>("1234");
+
+  // ok, now we want to receive a protobuf serialized object.
+  auto receive_protobuf_object = protobuf::receive<package::message>("8080");
+
+  if (receive_protobuf_object == nullptr)
+    std::cerr << "Erreur :(" << std::endl;
 
 }
 

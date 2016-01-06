@@ -35,4 +35,9 @@ before_script:
     - $CC --version
     - ${CMAKE_BINARY} --version
 
-script: ./.travis.sh
+script:
+  #! /bin/bash
+  mkdir build
+  cd build
+  cmake ../
+  make
