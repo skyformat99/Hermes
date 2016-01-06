@@ -16,8 +16,7 @@ as quick and cunning._
 
 #### What is it ?
 
-Hermes is an attempt to provide all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [![Asio]( http://think-async.com/Asio
-)] which is a cross-platform C++ library for network.
+Hermes is an attempt to provide all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [`Asio`](http://think-async.com/Asio) which is a cross-platform C++ library for network.
 In order to meet user's wishes, Hermes is able to handle some famous serialization protocols and thus can be used in various kind of c++ program wherein network communication is needed.
 As i said, Hermes has been designed to be pretty simple to use, you will need to write only a few lines to do what you want.
 
@@ -31,8 +30,8 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 - serialization:
   When we thought about serialization we knew we had to implement into Hermes the awesome
   Google serialization protocols
-  - [![protobuf](https://github.com/google/protobuf.git)]
-  - [![flatbuffer](https://github.com/google/flatbuffers.git)]
+  - [`protobuf`](https://github.com/google/protobuf)
+  - [`flatbuffer`](https://github.com/google/flatbuffers)
   - binary.
 
 
@@ -72,7 +71,7 @@ and we will be happy to discuss about it. Do not hesitate to open an issue, if y
 
 ## Thanks
 
-Thanks to my mate and friend [![Manu](https://github.com/chambo-e)] for the original idea :)
+Thanks to my mate and friend [`Manu`](https://github.com/chambo-e) for the original idea :)
 
 
 > **WARNING**: this repository is being actively developed. It is farm from being stable.

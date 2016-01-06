@@ -24,7 +24,7 @@ So for obvious reasons, Hermes network operations about protobuf will always use
 
 One more thing, as you should know, using protobuf needs to have defined a .proto model and generate according classes. So let's assume that our protobuf package is name 'package' and our message model named 'msg'.I know i'm quite imaginative :)
 
-  if you need help about using protobuf : [![Google Protocol Buffers doc](https://developers.google.com/protocol-buffers/?hl=en)]
+  if you need help about using protobuf : [`Google Protocol Buffers doc`](https://developers.google.com/protocol-buffers/?hl=en)
 
 - Example: Synchronous sending/receiving protobuf object.
 
