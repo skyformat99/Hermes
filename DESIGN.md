@@ -22,7 +22,7 @@ Google Protocol Buffers are a language-neutral, platform-neutral, mechanism for 
 Here, i want to point the 'structured data', that means we clearly have to use a communication protocol which allows us to be sure to get all data and in the right order. Without this, it will be impossible to unserialize object and get data back.
 So for obvious reasons, Hermes network operations about protobuf will always use TCP protocol.
 
-One more thing, as you should know, using protobuf needs to have defined a .proto model and generate according classes. So let's assume that our protobuf package is name 'package' and our message model named 'msg'.I know i'm quite imaginative :)
+One more thing, as you should know, using protobuf needs to have defined a .proto model and generate according classes. So let's assume that our protobuf package is name 'package' and our message model named 'message'.I know i'm quite imaginative :)
 
   if you need help about using protobuf : [`Google Protocol Buffers doc`](https://developers.google.com/protocol-buffers/?hl=en)
 
@@ -39,16 +39,16 @@ One more thing, as you should know, using protobuf needs to have defined a .prot
   // Here the following prototypes in Hermes::protobuf, the template T represents your protobuf
   // message model, in our example package::message. Function send returns number of bytes sent.
   template<typename T>
-  std::size_t send(const std::string& host, const std::string& port, T* message);
+  std::size_t send(const std::string& host, const std::string& port, std::shared_ptr<T> message);
 
-  // receive returns a pointer to an object of type T created by parsing the string received
+  // receive returns a smart_pointer to an object of type T created by parsing the string received
   // through TCP socket. This string is a protobuf object serialized.
   template<typename T>
-  T* receive(const std::string& port);
+  std::shared_ptr<T> receive(const std::string& port);
 
 
   // we start by declaring our protobuf object
-  auto protobuf_object = new package::msg;
+  auto protobuf_object = new package::message;
 
   // Once we have set the according data which want to be sent. we call the send function.
   // In case of error, 0 is returned.
@@ -64,7 +64,7 @@ One more thing, as you should know, using protobuf needs to have defined a .prot
   // ok, now we want to receive a protobuf serialized object.
   auto receive_protobuf_object = protobuf::receive<package::message>("8080");
 
-  if (receive_protobuf_object == nullptr)
+  if (receive_protobuf_object.get() == nullptr)
     std::cerr << "Erreur :(" << std::endl;
 
 }
