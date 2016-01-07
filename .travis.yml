@@ -36,4 +36,8 @@ before_script:
     - ${CMAKE_BINARY} --version
 
 script:
-    - echo "hello"
+  #! /bin/bash
+  mkdir build
+  cd build
+  cmake ../
+  make
