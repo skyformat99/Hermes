@@ -1,7 +1,7 @@
 project("Hermes")
 
 set(PROJECT_NAME Hermes)
-cmake_minimum_required(VERSION 3.3.2 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR true)
 set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
