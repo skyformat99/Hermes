@@ -22,7 +22,7 @@ void receive_routine() {
   assert(test->msg() == "Hope it works!");
 }
 
-void test_synchronous_protobuf_communication()
+void test_protobuf_synchronous_operations()
 {
   std::string serialized;
   auto protobuf_to_send = std::make_shared<com::Message>();
@@ -38,4 +38,8 @@ void test_synchronous_protobuf_communication()
   std::thread thread_send(send_routine, protobuf_to_send);
   thread_send.join();
   thread_receive.join();
+}
+
+void test_protobuf_asynchronous_operations() {
+  
 }

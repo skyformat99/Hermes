@@ -3,6 +3,7 @@
 
 int main()
 {
-  test_synchronous_protobuf_communication();
+  test_protobuf_synchronous_operations();
+  test_protobuf_asynchronous_operations();
   return 0;
 }
