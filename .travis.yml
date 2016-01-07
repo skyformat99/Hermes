@@ -26,7 +26,6 @@ before_install:
     - wget https://protobuf.googlecode.com/files/protobuf-2.4.1.tar.gz --no-check-certificate
     - tar -xzvf protobuf-2.4.1.tar.gz
     - cd protobuf-2.4.1 && ./configure --prefix=/usr && make && sudo make install
-    - ./install-sh
 
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
