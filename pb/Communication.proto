@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package com;
+
+message  Message {
+
+  int32 id = 1;
+  string name = 2;
+  string object = 3;
+  string from = 4;
+  string to = 5;
+  string msg = 6;
+}
+
+message Communication {
+  repeated Message message = 1;
+}

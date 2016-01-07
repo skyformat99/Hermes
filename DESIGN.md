@@ -54,10 +54,10 @@ One more thing, as you should know, using protobuf needs to have defined a .prot
 
   // Once we have set the according data which want to be sent. we call the send function.
   // In case of error, 0 is returned.
-  auto error = protobuf::send<package::message>("127.0.0.1", "8080", protobuf_object);
+  auto size = protobuf::send<package::message>("127.0.0.1", "8080", protobuf_object);
 
 
-  if (not error)
+  if (not size)
     std::cerr << "Error :(" << std::endl;
   else
     std::cout << "Message sent :)" << std::endl;

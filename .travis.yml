@@ -41,3 +41,4 @@ script:
   cd build
   cmake ../
   make
+  ./hermes_tests
