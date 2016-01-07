@@ -36,6 +36,5 @@ before_script:
     - echo $CXX
     - $CXX --version
     - $CC --version
-    - ${CMAKE_BINARY} --version
 
 script: ./.travis.sh
