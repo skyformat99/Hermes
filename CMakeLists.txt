@@ -5,8 +5,9 @@ cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
 set(CMAKE_INCLUDE_CURRENT_DIR true)
 set(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
-include(FindProtobuf)
 find_package(Protobuf REQUIRED)
+include_directories(${PROTOBUF_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR
     "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
@@ -44,12 +45,11 @@ include_directories(tests)
 include_directories(include)
 include_directories(libs/asio/asio)
 include_directories(libs/asio/asio/include)
-include_directories(${PROTOBUF_INCLUDE_DIR})
 
 
 add_executable(hermes_tests pb/Communication.pb.cc
                            src/main.cpp)
 
 target_link_libraries(hermes_tests ${Boost_FILESYSTEM_LIBRARY}
-                                  ${Boost_SYSTEM_LIBRARY}
-                                  ${PROTOBUF_LIBRARY})
+                                   ${Boost_SYSTEM_LIBRARY}
+                                   ${PROTOBUF_LIBRARY})
