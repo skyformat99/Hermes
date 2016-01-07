@@ -35,10 +35,4 @@ before_script:
     - $CC --version
     - ${CMAKE_BINARY} --version
 
-script:
-  #! /bin/bash
-  mkdir build
-  cd build
-  cmake ../
-  make
-  ./hermes_tests
+script: ./.travis.sh
