@@ -26,6 +26,11 @@ std::size_t send(const std::string& host, const std::string& port,
   std::string serialized;
   char buffer[2048] = {0};
   asio::io_context io_service;
+  asio::error_code error = asio::error::host_not_found;
+
+  if (not message)
+    throw std::logic_error(
+        "[protobuff]: given nullptr as parameter (message).");
 
   tcp::resolver resolver(io_service);
   tcp::socket socket(io_service);
@@ -33,10 +38,16 @@ std::size_t send(const std::string& host, const std::string& port,
 
   message->SerializeToString(&serialized);
   std::strcpy(buffer, serialized.c_str());
-  asio::connect(socket, endpoint);
-  asio::write(socket, asio::buffer(buffer, serialized.size()));
+  asio::connect(socket, endpoint, error);
+
+  if (error) {
+    socket.close();
+    throw asio::system_error(error);
+  }
+
+  asio::write(socket, asio::buffer(buffer, serialized.size()), error);
   socket.close();
-  io_service.run();
+  if (error) throw asio::system_error(error);
   return serialized.size();
 }
 
@@ -48,29 +59,44 @@ std::shared_ptr<T> receive(const std::string& port) {
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
-  acceptor.accept(socket);
+  tcp::acceptor::reuse_address option(true);
+  acceptor.set_option(option);
+  acceptor.accept(socket, error);
+
+  if (error) {
+    acceptor.close();
+    socket.close();
+    throw std::runtime_error(
+        "[protobuf] Unexpected error occurred: accept failed to accept "
+        "socket.");
+  }
+
   socket.read_some(asio::buffer(buffer), error);
+  acceptor.close();
   socket.close();
 
   if (error == asio::error::eof)
-    return nullptr;
+    throw std::runtime_error("[protobuf] connection closed.");
   else if (error)
     throw asio::system_error(error);
 
   auto response = buffer;
   auto result = std::make_shared<T>();
   result->ParseFromString(response);
-  io_service.run();
   return result;
 }
 
 typedef std::function<void()> callback;
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
-                std::shared_ptr<T> message, const callback& handler =
-                nullptr) {
+                std::shared_ptr<T> message, const callback& handler = nullptr) {
+  char buffer[2048] = {0};
   std::string serialized;
   asio::io_context io_service;
+
+  if (not message)
+    throw std::logic_error(
+        "[protobuff]: given nullptr as parameter (message).");
 
   tcp::socket socket(io_service);
   tcp::resolver resolver(io_service);
@@ -79,11 +105,9 @@ void async_send(const std::string& host, const std::string& port,
   socket.async_connect(endpoint->endpoint(),
                        [&](const asio::error_code& error) {
 
-    char buffer[2048] = {0};
-
     if (error) {
       socket.close();
-      return;
+      throw std::system_error(error);
     }
 
     std::strcpy(buffer, serialized.c_str());
@@ -92,7 +116,7 @@ void async_send(const std::string& host, const std::string& port,
 
       if (not bytes || error) {
         socket.close();
-        return;
+        throw std::system_error(error);
       }
 
       if (handler) handler();
