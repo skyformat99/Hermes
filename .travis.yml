@@ -36,8 +36,4 @@ before_script:
     - ${CMAKE_BINARY} --version
 
 script:
-  - mkdir build
-  - cd build
-  - cmake ../
-  - make
-  - ./hermes_tests
+  - echo "hello"
