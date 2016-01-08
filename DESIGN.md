@@ -72,3 +72,75 @@ One more thing, as you should know, using protobuf needs to have defined a .prot
 }
 
 ```
+- Asynchronous send/receive of a protobuf object.
+
+```c++
+{
+  #include "Hermes.hpp"
+
+  #include <string>
+  #include <memory>
+  #include <iostream>
+
+  using namespace Hermes;
+
+  // Asynchronous send
+  //
+  // The followings prototypes will be usefull.
+
+  typedef std::function<void()> callback;
+  template <typename T>
+  void aync_send(const std::string& host, const std::string& port,
+                 std::shared_ptr<T> message, const callback& handler = nullptr);
+
+
+   // As you can see, callback is a typedef representing a function object;
+   // By default callback equals to nullptr, to allow user to provide it or not.
+
+
+   auto protobuf = new package::message;
+
+   protobuf::async_send("127.0.0.1", "8080", protobuf);
+
+
+   protobuf::async_send("127.0.0.1", "8080", protobuf, [](){
+      // do_some_stuff
+   });
+
+  // Asynchronously receive
+  //
+  typedef std::function<void(const std::string&)> rcallback;
+  template <typename T>
+  void async_receive(const std::string& port, std::shared_ptr<T> message,
+                     const rcallback& handler = nullptr);
+
+   auto protobuf_to_receive = new package::message;
+   protobuf_to_receive = nullptr;
+
+   // async_receive is a bit more complex, as it is impossible to predicate
+   // when the asynchronous operation will end, you have to pass a shared_ptr as parameter
+   // to fill it with the data.
+   // This function cannot simply return the T object because of asynchronous.
+   // So the default behaviour has been thought to fill the T object when the handler of the
+   // asynchronous receive is called, at this moment we are sure that the receive has been
+   // performed.
+   // An other way is to pass a rcallback to async_receive.
+
+
+   protobuf::async_receive("8080", protobuf_to_receive);
+
+   if (not protobuf_to_receive)
+      std::cout << "data not received yet" << "\n";
+
+
+    protobuf::async_receive("8080", protobuf_to_receive, [](const std::string& res){
+
+        protobuf_to_receive->ParseFromString(res);
+        // do some stuff
+    });
+
+}
+
+```
+I hope this examples will help.
+[`protobuf test`](https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp) you could take a look to the protobuf tests, it may help.
