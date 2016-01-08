@@ -9,8 +9,11 @@
 using namespace Hermes;
 
 void send_routine(std::shared_ptr<com::Message> message) {
+  std::string serialized;
+
+  message->SerializeToString(&serialized);
   auto size = protobuf::send<com::Message>("127.0.0.1", "8246", message);
-  assert(size != 0);
+  assert(size == serialized.size());
   std::cout << "protobuf sent :)" << "\n";
 }
 
