@@ -46,8 +46,10 @@ std::size_t send(const std::string& host, const std::string& port,
   }
 
   asio::write(socket, asio::buffer(buffer, serialized.size()), error);
-  socket.close();
-  if (error) throw asio::system_error(error);
+  if (error) {
+    socket.close();
+    throw asio::system_error(error);
+  }
   return serialized.size();
 }
 
@@ -72,13 +74,15 @@ std::shared_ptr<T> receive(const std::string& port) {
   }
 
   socket.read_some(asio::buffer(buffer), error);
-  acceptor.close();
-  socket.close();
 
-  if (error == asio::error::eof)
+  if (error == asio::error::eof) {
+    acceptor.close();
     throw std::runtime_error("[protobuf] connection closed.");
-  else if (error)
+  } else if (error) {
+    acceptor.close();
+    socket.close();
     throw asio::system_error(error);
+  }
 
   auto response = buffer;
   auto result = std::make_shared<T>();
@@ -114,12 +118,63 @@ void async_send(const std::string& host, const std::string& port,
     asio::async_write(socket, asio::buffer(buffer, serialized.size()),
                       [&](const asio::error_code& error, std::size_t bytes) {
 
-      if (not bytes || error) {
+      if (error) {
         socket.close();
         throw std::system_error(error);
       }
 
+      if (not bytes)
+        throw std::runtime_error(
+          "[protobuf] Unexpected error occurred: 0 bytes sent"
+        );
+
       if (handler) handler();
+
+    });
+
+  });
+  io_service.run();
+}
+
+typedef std::function<void(const std::string&)> rcallback;
+template <typename T>
+void async_receive(const std::string& port, std::shared_ptr<T> message,
+                   const rcallback& handler = nullptr) {
+  char buffer[2048] = {0};
+  asio::io_context io_service;
+
+  tcp::socket socket(io_service);
+  tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
+  tcp::acceptor::reuse_address option(true);
+  acceptor.set_option(option);
+  acceptor.async_accept(socket, [&](const asio::error_code& error) {
+
+    if (error) {
+      acceptor.close();
+      socket.close();
+      throw asio::system_error(error);
+    }
+
+    asio::async_read(socket, asio::buffer(buffer, 2048),
+                     [&](const asio::error_code& error, std::size_t bytes) {
+
+      if (error && error != asio::error::eof) {
+        acceptor.close();
+        socket.close();
+        throw asio::system_error(error);
+      }
+
+      if (not bytes)
+        throw std::runtime_error(
+          "[protobuf] Unexpected error occurred: 0 bytes received"
+        );
+
+      if (handler) handler(std::string(buffer));
+
+      else {
+        std::string result(buffer);
+        message->ParseFromString(result);
+      }
 
     });
 
