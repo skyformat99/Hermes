@@ -16,8 +16,8 @@ as quick and cunning._
 
 #### What is it ?
 
-Hermes is an attempt to provide all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [`Asio`](http://think-async.com/Asio) which is a cross-platform C++ library for network.
-In order to meet user's wishes, Hermes is able to handle some famous serialization protocols and thus can be used in various kind of c++ program wherein network communication is needed.
+Hermes is an attempt to provide to all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [`Asio`](http://think-async.com/Asio) which is a cross-platform C++ library for network.
+In order to meet user's wishes, Hermes is able to handle some famous serialization protocols and thus can be used in several kind of c++ program wherein network communication is needed.
 As i said, Hermes has been designed to be pretty simple to use, you will need to write only a few lines to do what you want.
 
 
@@ -28,25 +28,23 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
   but he is supporting TCP, UDP and could easily do asynchronous operations thanks to Asio's asynchronous model.
 
 - serialization:
-  When we thought about serialization we knew we had to implement into Hermes the awesome
-  Google serialization protocols
   - [`protobuf`](https://github.com/google/protobuf)
   - [`flatbuffer`](https://github.com/google/flatbuffers)
   - binary.
-
+  Above, the serialization protocols handled by Hermes.
 
 ## Requirements
 - c++11
 
-The following dependencies are required to use all Hermes features but they are included into Hermes repository if you do not have them.
+The following libraries are required to use all Hermes features but they are included into Hermes repository if you do not have them.
 - Asio without-boost
 - Google Protocol Buffers
 - Google FlatBuffers
 
 ## Compiling
-The library is header only, so there is nothing to build and to link with your program.
+Hermes is a header only library, so there is nothing to build and to link with your program.
 
-to download Hermes:
+ - Download Hermes:
 
 ```bash
   git clone --recursive https://github.com/TommyStarK/Hermes.git
@@ -55,7 +53,7 @@ to download Hermes:
 
 ## Documentation
 
-You will find a full commmented documentation, including various simple examples, here [`Hermes Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md).
+You will find a full commmented documentation, including several examples, here [`Hermes Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md).
 
 
 ## Build status

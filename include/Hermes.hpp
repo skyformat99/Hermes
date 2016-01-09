@@ -98,7 +98,7 @@ void async_send(const std::string& host, const std::string& port,
   std::string serialized;
   asio::io_context io_service;
 
-  if (not message)
+  if (not message || not message.get())
     throw std::logic_error(
         "[protobuff]: given nullptr as parameter (message).");
 
@@ -164,7 +164,7 @@ void async_receive(const std::string& port, std::shared_ptr<T> message,
         throw asio::system_error(error);
       }
 
-      if (not bytes)
+      if (not bytes || std::string(buffer).empty())
         throw std::runtime_error(
           "[protobuf] Unexpected error occurred: 0 bytes received"
         );
