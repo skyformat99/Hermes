@@ -126,7 +126,8 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   // For this reason, you have to provide a raw pointer of a protobuf message using get() method
   // of std::shared_ptr to 'async_receive'.
   // There are two cases. First, you do not provide a callback, the protobuf message
-  // parses the string received when the internal asynchronous handler is called by the receive // operation. If you provide one, you could do the parsing in your function.
+  // parses the string received when the internal asynchronous handler is called by
+  // the receive operation. If you provide one, you could do the parsing in your function.
 
   auto response = std::make_shared<package::message>();
 
