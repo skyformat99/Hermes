@@ -11,8 +11,12 @@ Hermes has two different parts:
     Hermes is a fast and easy way to send and receive serialized data through socket.
     Thanks to Google Protocol Buffers and FlatBuffers, Hermes could send/receive serialized
     data.
-    Note: JSON is not handled by default, because all famous library has a to_string() method.
 
+Note: JSON is not handled by default, because all famous library has a to_string() method.
+
+- Modules:
+    Hermes is split into modules, you do not have to use all features if you do not want to.
+    That's why you will find them into repository include/modules, and just include the desired one.
 
 ## Serialization
 
