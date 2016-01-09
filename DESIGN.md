@@ -3,7 +3,7 @@
 In this document, we will define each feature of Hermes. We will describe how to use it.
 Let's begin with an overview of Hermes core functionalities.
 
-Hermes has two different parts:
+Hermes has three different parts:
 - Messenger:
     A global entity which allows you to create network softwares. A messenger could be a client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
 
@@ -17,6 +17,19 @@ Note: JSON is not handled by default, because all famous library has a to_string
 - Modules:
     Hermes is split into modules, you do not have to use all features if you do not want to.
     That's why you will find them into repository include/modules, and just include the desired one.
+
+## Modules
+  It is quite simple. Go to include/modules and choose the wanted module.
+  You just have to include it.
+
+  - Example:
+
+  ```c++
+    // For example, i just need to send/receive protobuf message through socket
+    #include "Hermes_protobuf.hpp"
+  ```
+  Note: All modules are in namespace 'Hermes'.
+
 
 ## Serialization
 

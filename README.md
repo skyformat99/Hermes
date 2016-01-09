@@ -12,7 +12,7 @@ as quick and cunning._
 
 #### What is it ?
 
-Hermes is an attempt to provide to all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on the great [`Asio`](http://think-async.com/Asio) which is a cross-platform C++ library for network.
+Hermes is an attempt to provide to all new developers, a user-friendly C++ support enabling communication through socket. Hermes is based on  [`Asio`](http://think-async.com/Asio) which is a cross-platform C++ library for network.
 In order to meet user's wishes, Hermes is able to handle some famous serialization protocols and thus can be used in several kind of c++ program wherein network communication is needed.
 As i said, Hermes has been designed to be pretty simple to use, you will need to write only a few lines to do what you want.
 
@@ -28,6 +28,11 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
   - [`flatbuffer`](https://github.com/google/flatbuffers)
 
   Above, the serialization protocols handled by Hermes.
+
+- Modularity:
+  Hermes is split into modules that allows user to choose only the desired one and include it
+  instead including the complete library. Furthermore, it makes easier the new feature
+  implementation.
 
 ## Requirements
 - c++11
