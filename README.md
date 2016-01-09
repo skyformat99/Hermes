@@ -31,6 +31,7 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
   - [`protobuf`](https://github.com/google/protobuf)
   - [`flatbuffer`](https://github.com/google/flatbuffers)
   - binary.
+
   Above, the serialization protocols handled by Hermes.
 
 ## Requirements

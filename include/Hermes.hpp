@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <functional>
 
+#include <assert.h>
+
 #include "google/protobuf/message.h"
 #include "asio.hpp"
 
@@ -28,9 +30,7 @@ std::size_t send(const std::string& host, const std::string& port,
   asio::io_context io_service;
   asio::error_code error = asio::error::host_not_found;
 
-  if (not message)
-    throw std::logic_error(
-        "[protobuff]: given nullptr as parameter (message).");
+  assert(message->GetDescriptor());
 
   tcp::resolver resolver(io_service);
   tcp::socket socket(io_service);
@@ -69,7 +69,7 @@ std::shared_ptr<T> receive(const std::string& port) {
     acceptor.close();
     socket.close();
     throw std::runtime_error(
-        "[protobuf] Unexpected error occurred: accept failed to accept "
+        "[protobuf] Unexpected error occurred: acceptor failed to accept "
         "socket.");
   }
 
@@ -90,7 +90,7 @@ std::shared_ptr<T> receive(const std::string& port) {
   return result;
 }
 
-typedef std::function<void()> callback;
+typedef std::function<void(std::size_t)> callback;
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 std::shared_ptr<T> message, const callback& handler = nullptr) {
@@ -98,9 +98,7 @@ void async_send(const std::string& host, const std::string& port,
   std::string serialized;
   asio::io_context io_service;
 
-  if (not message || not message.get())
-    throw std::logic_error(
-        "[protobuff]: given nullptr as parameter (message).");
+  assert(message->GetDescriptor());
 
   tcp::socket socket(io_service);
   tcp::resolver resolver(io_service);
@@ -125,10 +123,9 @@ void async_send(const std::string& host, const std::string& port,
 
       if (not bytes)
         throw std::runtime_error(
-          "[protobuf] Unexpected error occurred: 0 bytes sent"
-        );
+            "[protobuf] Unexpected error occurred: 0 bytes sent");
 
-      if (handler) handler();
+      if (handler) handler(bytes);
 
     });
 
@@ -138,10 +135,12 @@ void async_send(const std::string& host, const std::string& port,
 
 typedef std::function<void(const std::string&)> rcallback;
 template <typename T>
-void async_receive(const std::string& port, std::shared_ptr<T> message,
+void async_receive(const std::string& port, T* const message,
                    const rcallback& handler = nullptr) {
   char buffer[2048] = {0};
   asio::io_context io_service;
+
+  assert(message->GetDescriptor());
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
@@ -166,10 +165,10 @@ void async_receive(const std::string& port, std::shared_ptr<T> message,
 
       if (not bytes || std::string(buffer).empty())
         throw std::runtime_error(
-          "[protobuf] Unexpected error occurred: 0 bytes received"
-        );
+            "[protobuf] Unexpected error occurred: 0 bytes received");
 
-      if (handler) handler(std::string(buffer));
+      if (handler)
+        handler(std::string(buffer));
 
       else {
         std::string result(buffer);

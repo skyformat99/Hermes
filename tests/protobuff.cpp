@@ -14,7 +14,7 @@ void send_routine(std::shared_ptr<com::Message> message) {
   message->SerializeToString(&serialized);
   auto size = protobuf::send<com::Message>("127.0.0.1", "8246", message);
   assert(size == serialized.size());
-  std::cout << "protobuf sent :)" << "\n";
+  std::cout << "message sent :)" << "\n";
 }
 
 void receive_routine() {
@@ -24,7 +24,7 @@ void receive_routine() {
   assert(test->from() == "from");
   assert(test->to() == "to");
   assert(test->msg() == "msg");
-  std::cout << "It worked :)" << "\n";
+  std::cout << "response received :)" << "\n";
 }
 
 void test_protobuf_synchronous_operations() {
@@ -53,7 +53,7 @@ void test_protobuf_asynchronous_operations() {
   message->set_msg("msg: ok");
 
   std::thread thread_receive([&]() {
-    protobuf::async_receive<com::Message>("25555", response,
+    protobuf::async_receive<com::Message>("25555", response.get(),
                                           [&](const std::string& res) {
       response->ParseFromString(res);
       assert(response->name() == "name: ok");
@@ -61,14 +61,15 @@ void test_protobuf_asynchronous_operations() {
       assert(response->from() == "from: ok");
       assert(response->to() == "to: ok");
       assert(response->msg() == "msg: ok");
-      std::cout << "protobuf received :)" << "\n";
+      std::cout << "string received: " << res << "\n";
     });
   });
 
   std::thread thread_send([&]() {
     protobuf::async_send<com::Message>("127.0.0.1", "25555", message,
-                                       [&]() {
-      std::cout << "do some stuff :)" << std::endl;
+                                       [&](std::size_t bytes) {
+
+      std::cout << "bytes sent: " << bytes << "\n";
     });
   });
 

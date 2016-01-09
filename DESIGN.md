@@ -5,7 +5,7 @@ Let's begin with an overview of Hermes core functionalities.
 
 Hermes has two different parts:
 - Messenger:
-    A global entity which allows you to create network softwares. A messenger could be client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
+    A global entity which allows you to create network softwares. A messenger could be a client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
 
 - Serialization:
     Hermes is a fast and easy way to send and receive serialized data through socket.
@@ -44,7 +44,7 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   std::shared_ptr<T> receive(const std::string& port);
 
   // Asynchronous operations
-  typedef std::function<void()> callback;
+  typedef std::function<void(std::size_t)> callback;
 
   template <typename T>
   void async_send(const std::string& host,
@@ -56,7 +56,7 @@ One more thing, as you should know, using protobuf involves having defined a .pr
 
   template <typename T>
   void async_receive(const std::string& host,
-                     std::shared_ptr<T> message,
+                     T * const message,
                      const rcallback& handler = nullptr);
 
 ```
@@ -86,7 +86,7 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   else
     std::cout << "Message sent :)" << std::endl;
 
-  // Similarly, i you want to receive a protobuf message
+  // Similarly, if you want to receive a protobuf message
   auto response = protobuf::receive<package::message>("8080");
 
   if (not response)
@@ -110,21 +110,23 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   // We start by declaring our protobuf message
   auto message = std::make_shared<package::message>();
 
-  // Asynchronous send of a serialized version of the message without providing callback.
+  // Asynchronous send of a serialized version of our message without providing callback.
   protobuf::async_send("127.0.0.1", "8080", message);
 
-  // Asynchronous send of a serialized version of the message with callback
+  // Asynchronous send of a serialized version of our message with callback
   // given as lambda in parameters.
-  protobuf::async_send("127.0.0.1", "8080", obj, [](){
-      // do_some_stuff
+  protobuf::async_send("127.0.0.1", "8080", message, [](std::size_t bytes){
+
+    std::cout << "bytes sent: " << bytes << "\n";
+    // do some stuff
   });
 
-  // Predict ending of asynchronous operations is impossible that's why 'async_send'
-  // cannot return a std::shared_ptr like its counterpart 'send'.
-  // For this reason, you have to pass a shared protobuf message to 'async_receive'
-  // as parameter. There are two cases. First, you do not provide a callback, the shared message
-  // parses the string received when the internal asynchronous handler is called by the
-  // receive operation. If you provide one, you could do the parsing in your function.
+  // Predict ending of asynchronous operations is impossible that's why 'async_send' cannot  
+  // return a std::shared_ptr like its counterpart 'send'.
+  // For this reason, you have to provide a raw pointer of a protobuf message using get() method
+  // of std::shared_ptr to 'async_receive'.
+  // There are two cases. First, you do not provide a callback, the protobuf message
+  // parses the string received when the internal asynchronous handler is called by the receive // operation. If you provide one, you could do the parsing in your function.
 
   auto response = std::make_shared<package::message>();
 
