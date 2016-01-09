@@ -9,8 +9,9 @@ Hermes has two different parts:
 
 - Serialization:
     Hermes is a fast and easy way to send and receive serialized data through socket.
-    So far, Hermes is using three different serialization protocol. Two of them belong to
-    Google, Protocol Buffers and FlatBuffers. Last one is binary.
+    Thanks to Google Protocol Buffers and FlatBuffers, Hermes could send/receive serialized
+    data.
+    Note: JSON is not handled by default, because all famous library has a to_string() method.
 
 
 ## Serialization

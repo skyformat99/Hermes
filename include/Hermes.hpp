@@ -25,12 +25,12 @@ using namespace google::protobuf;
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  std::shared_ptr<T> message) {
+  assert(message->GetDescriptor());
+
   std::string serialized;
   char buffer[2048] = {0};
   asio::io_context io_service;
   asio::error_code error = asio::error::host_not_found;
-
-  assert(message->GetDescriptor());
 
   tcp::resolver resolver(io_service);
   tcp::socket socket(io_service);
@@ -84,9 +84,8 @@ std::shared_ptr<T> receive(const std::string& port) {
     throw asio::system_error(error);
   }
 
-  auto response = buffer;
   auto result = std::make_shared<T>();
-  result->ParseFromString(response);
+  result->ParseFromString(std::string(buffer));
   return result;
 }
 
@@ -94,11 +93,11 @@ typedef std::function<void(std::size_t)> callback;
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 std::shared_ptr<T> message, const callback& handler = nullptr) {
+  assert(message->GetDescriptor());
+
   char buffer[2048] = {0};
   std::string serialized;
   asio::io_context io_service;
-
-  assert(message->GetDescriptor());
 
   tcp::socket socket(io_service);
   tcp::resolver resolver(io_service);
@@ -137,10 +136,10 @@ typedef std::function<void(const std::string&)> rcallback;
 template <typename T>
 void async_receive(const std::string& port, T* const message,
                    const rcallback& handler = nullptr) {
+  assert(message->GetDescriptor());
+
   char buffer[2048] = {0};
   asio::io_context io_service;
-
-  assert(message->GetDescriptor());
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
@@ -169,11 +168,8 @@ void async_receive(const std::string& port, T* const message,
 
       if (handler)
         handler(std::string(buffer));
-
-      else {
-        std::string result(buffer);
-        message->ParseFromString(result);
-      }
+      else
+        message->ParseFromString(std::string(buffer));
 
     });
 

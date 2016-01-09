@@ -1,10 +1,6 @@
 Hermes version 1.0
 
-
-# Welcome to Hermes :)
-
-
-## Hermes
+# Hermes
 
 > _Hermes is an Olympian god in Greek religion and mythology, he is described
 as quick and cunning._
@@ -30,7 +26,6 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 - serialization:
   - [`protobuf`](https://github.com/google/protobuf)
   - [`flatbuffer`](https://github.com/google/flatbuffers)
-  - binary.
 
   Above, the serialization protocols handled by Hermes.
 
