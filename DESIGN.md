@@ -107,8 +107,8 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   // Similarly, if you want to receive a protobuf message
   auto response = protobuf::receive<package::message>("8080");
 
-  if (not response)
-    std::cerr << "Erreur :(" << std::endl;
+  // Do some stuff with our protobuf
+  auto descriptor = response->GetDescriptor();
 
 }
 
@@ -151,9 +151,11 @@ One more thing, as you should know, using protobuf involves having defined a .pr
 
   protobuf::async_receive("8080", response);
 
-  if (not response)
-    std::cout << "data not received yet" << "\n";
-
+  // We want to check if we get a response, so i will ask if one of my message fields is empty.
+  // In my .proto model, message is defined with a field named 'name' and represented by a string
+  // So i could do:
+  if (response->name().empty())
+    std::cout << "response not receive yet" << "\n";
 
   protobuf::async_receive("8080", response [](const std::string& res){
 

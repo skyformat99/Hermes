@@ -4,7 +4,6 @@
 #include <memory>
 #include <iostream>
 #include <stdexcept>
-#include <algorithm>
 #include <functional>
 
 #include <assert.h>
@@ -154,13 +153,13 @@ void async_receive(const std::string& port, T* const message,
     asio::async_read(socket, asio::buffer(buffer, 2048),
                      [&](const asio::error_code& error, std::size_t bytes) {
 
-      if (error && error != asio::error::eof) {
+      if (error and error != asio::error::eof) {
         acceptor.close();
         socket.close();
         throw asio::system_error(error);
       }
 
-      if (not bytes || std::string(buffer).empty())
+      if (not bytes or std::string(buffer).empty())
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes received");
 
