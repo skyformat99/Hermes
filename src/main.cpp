@@ -2,27 +2,40 @@
 #include "protobuff.cpp"
 #include "messenger.cpp"
 
+void display(const std::string& module,
+            const std::string& description,
+            const std::string& message) {
+
+  std::cout << "\n";
+  std::cout << "##################################################" << "\n";
+  std::cout << "#               !! TEST !!                       #" << "\n";
+  std::cout << "##################################################" << "\n";
+  std::cout << "Module: " << module << " => " << description << "\n";
+  std::cout << message << "\n\n";
+}
+
 int main()
 {
   //Testing Hermes protobuf operations
-  std::cout << "########### TEST HERMES PROTOBUF OPERATIONS ###########" << "\n";
+  display("Serialization", "protobuf", "Testing hermes protobuf operations");
   test_protobuf_synchronous_operations();
+  std::cout << "\n ***  synchronous reading/writting operations: [ok]" << "\n";
   test_protobuf_asynchronous_operations();
-  std::cout << "protobuf: [ok]" << "\n";
+  std::cout << "\n *** asynchronous reading/writting operations: [ok]" << "\n";
 
   // testing Hermes session
-  std::cout << "################# TEST HERMES SESSION #################" << "\n";
+  display("Messenger", "Session", "Testing session funcitonalities");
   test_session();
-  std::cout << "session: [ok]" << "\n";
+  std::cout << "\n *** session: [ok]" << "\n";
 
   // testing Hermes stream
-  std::cout << "################## TEST HERMES STREAM #################" << "\n";
+  display("Messenger", "Stream", "Testing stream");
   test_stream();
-  std::cout << "stream: [ok]" << "\n";
+  std::cout <<"\n *** stream: [ok]" << "\n";
 
   // testing Hermes Messenger
-  std::cout << "############# TEST HERMES MESSENGER CTOR ##############" << "\n";
+  display("Messenger", "Class", "Testing Messenger class");
   test_messenger_constructor();
-  std::cout << "Messenger ctor: [ok]" << "\n";
+  std::cout << "\n *** Messenger ctor: [ok]" << "\n";
   return 0;
 }
