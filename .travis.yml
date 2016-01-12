@@ -1,3 +1,5 @@
+sudo: required
+
 language: cpp
 
 env:
@@ -24,6 +26,12 @@ compiler:
 before_install:
     - wget https://cmake.org/files/v3.4/cmake-3.4.0-Linux-x86_64.tar.gz --no-check-certificate
     - tar -xzvf cmake-3.4.0-Linux-x86_64.tar.gz
+    - wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gz
+    - tar xzvf protobuf-2.6.1.tar.gz
+    - cd  protobuf-2.6.1
+    - ./configure
+    - sudo make install
+    - cd -
 
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
@@ -36,6 +44,7 @@ before_script:
     - $CC --version
     - ${CMAKE_BINARY} --version
     - ${CMAKE_BINARY} .
+    - make
 
 script:
-  - make
+  - ./test_hermes
