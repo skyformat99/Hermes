@@ -234,18 +234,26 @@ class Messenger {
   }
 };
 
+
 /**
 * Module: serialization - namespace protobuf
 *
 * @description:
+*   Contains Hermes protobuf operations.
+*   Allows user to send a serialized version of their protobuf message.
 *
+* @required:
+*   Define .proto model
+*   Generate according classes with protoc
 *
-*
+* @protocol:
+*   TCP
 */
 namespace protobuf {
 
 using namespace google::protobuf;
 
+// Synchronous writting operation.
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  std::shared_ptr<T> message) {
@@ -277,6 +285,7 @@ std::size_t send(const std::string& host, const std::string& port,
   return serialized.size();
 }
 
+// Synchronous reading operation.
 template <typename T>
 std::shared_ptr<T> receive(const std::string& port) {
   asio::error_code error;
@@ -313,6 +322,7 @@ std::shared_ptr<T> receive(const std::string& port) {
   return result;
 }
 
+// Asynchronous writting operation.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 std::shared_ptr<T> message, const callback& handler = nullptr) {
@@ -355,6 +365,7 @@ void async_send(const std::string& host, const std::string& port,
   io_service.run();
 }
 
+// Asynchronous reading operation.
 template <typename T>
 void async_receive(const std::string& port, T* const message,
                    const rcallback& handler = nullptr) {

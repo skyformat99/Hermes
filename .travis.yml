@@ -32,6 +32,13 @@ before_install:
     - ./configure
     - sudo make install
     - cd -
+    - wget http://sourceforge.net/projects/asio/files/asio/1.10.6%20%28Stable%29/boost_asio_1_10_6.tar.gz/download
+    - mv download asio-1.10.6.tar.gz
+    - tar xvf asio-1.10.6.tar.gz
+    - cd asio-1.10.6
+    - ./configure
+    - sudo make install
+    - cd -
 
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
