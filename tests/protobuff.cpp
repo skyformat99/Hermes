@@ -11,6 +11,7 @@ using namespace Hermes;
 void send_routine(std::shared_ptr<com::Message> message) {
   std::string serialized;
 
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
   message->SerializeToString(&serialized);
   auto size = protobuf::send<com::Message>("127.0.0.1", "8246", message);
   assert(size == serialized.size());
@@ -66,6 +67,7 @@ void test_protobuf_asynchronous_operations() {
   });
 
   std::thread thread_send([&]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
     protobuf::async_send<com::Message>("127.0.0.1", "25555", message,
                                        [&](std::size_t bytes) {
 

@@ -4,6 +4,7 @@
 #include <ctime>
 #include <chrono>
 #include <string>
+#include <thread>
 #include <memory>
 #include <iostream>
 #include <stdexcept>
@@ -19,6 +20,13 @@ namespace Hermes {
 
 using namespace asio::ip;
 
+/**
+* Ability namespace.
+*
+* @description:
+*   Various handlers.
+*
+*/
 namespace Ability {
 // get nth bit of an unsigned char.
 inline char get_n_bit(unsigned char* c, int n) {
@@ -28,6 +36,23 @@ inline char get_n_bit(unsigned char* c, int n) {
 // change nth bit of an unsigned char to the given value.
 inline void change_n_bit(unsigned char* c, int n, int value) {
   *c = (*c | (1 << n)) & ((value << n) | ((~0) ^ (1 << n)));
+}
+
+template <class A, class... B>
+void do_after(unsigned int seconds, bool async, A&& a, B&&... b) {
+  std::function<typename std::result_of<A(B...)>::type()> task(
+    std::bind(std::forward<A>(a), std::forward<B>(b)...)
+  );
+  if (async) {
+    std::thread([seconds, task](){
+      std::this_thread::sleep_for(std::chrono::seconds(seconds));
+      task();
+    }).detach();
+  }
+  else {
+    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+    task();
+  }
 }
 }  // namespace Ability
 
@@ -209,6 +234,14 @@ class Messenger {
   }
 };
 
+/**
+* Module: serialization - namespace protobuf
+*
+* @description:
+*
+*
+*
+*/
 namespace protobuf {
 
 using namespace google::protobuf;
