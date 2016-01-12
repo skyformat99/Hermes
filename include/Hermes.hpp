@@ -215,7 +215,7 @@ class Messenger {
  private:
   bool async_;
   unsigned char options_;
-  asio::io_context io_service_;
+  static asio::io_context io_service_;
   std::shared_ptr<Software> messenger_;
 
  public:
