@@ -35,7 +35,7 @@ before_script:
     - $CXX --version
     - $CC --version
     - ${CMAKE_BINARY} --version
-    - "${CMAKE_BINARY} ."
+    - ${CMAKE_BINARY} .
 
 script:
   - make
