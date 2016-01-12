@@ -254,11 +254,11 @@ class Messenger {
 *
 * @description:
 *   Contains Hermes protobuf operations.
-*   Allows user to send a serialized version of their protobuf message.
+*   Allows user to send/receive a serialized version of theirs protobuf messages.
 *
 * @required:
-*   Define .proto model
-*   Generate according classes with protoc
+*   Define Google .proto model.
+*   Generate according classes with protoc binary.
 *
 * @protocol:
 *   TCP

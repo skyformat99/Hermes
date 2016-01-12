@@ -32,11 +32,11 @@ before_install:
     - ./configure
     - sudo make install
     - cd -
-    - wget https://01.org/sites/default/files/asio-1.10.6.tar.gz
-    - tar xvf asio-1.10.6.tar.gz
-    - cd asio-1.10.6
-    - ./configure
-    - sudo make install
+    - wget http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz
+    - tar xvf boost_1_59_0.tar.gz
+    - cd boost_1_59_0
+    - ./bootstrap.sh
+    - ./b2 install
     - cd -
 
 install:
