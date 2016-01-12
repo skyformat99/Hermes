@@ -28,7 +28,7 @@ before_install:
     - tar -xzvf cmake-3.4.0-Linux-x86_64.tar.gz
     - wget https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz
     - tar xzvf protobuf-cpp-3.0.0-beta-2.tar.gz
-    - cd  protobuf-cpp-3.0.0-beta-2
+    - cd  protobuf-3.0.0-beta-2
     - ./configure
     - sudo make install
     - cd -
