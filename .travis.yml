@@ -16,6 +16,7 @@ addons:
             - g++-5
             - gcc-5
             - wget
+            - libboost-all-dev
             - libev-dev
 
 compiler:
@@ -29,12 +30,6 @@ before_install:
     - cd  protobuf-3.0.0-beta-2
     - ./configure
     - sudo make install
-    - cd -
-    - wget http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz
-    - tar xvf boost_1_59_0.tar.gz
-    - cd boost_1_59_0
-    - ./bootstrap.sh --prefix=/home/travis
-    - ./b2 install
     - cd -
 
 install:
