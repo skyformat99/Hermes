@@ -15,10 +15,26 @@ namespace Hermes {
 
 using namespace asio::ip;
 
+/**
+* Module: serialization - namespace protobuf
+*
+* @description:
+*   Contains Hermes protobuf operations.
+*   Allows user to send/receive a serialized version of theirs protobuf
+*messages.
+*
+* @required:
+*   Define Google .proto model.
+*   Generate according classes with protoc binary.
+*
+* @protocol:
+*   TCP
+*/
 namespace protobuf {
 
 using namespace google::protobuf;
 
+// Synchronous writting operation.
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  std::shared_ptr<T> message) {
@@ -50,6 +66,7 @@ std::size_t send(const std::string& host, const std::string& port,
   return serialized.size();
 }
 
+// Synchronous reading operation.
 template <typename T>
 std::shared_ptr<T> receive(const std::string& port) {
   asio::error_code error;
@@ -86,10 +103,11 @@ std::shared_ptr<T> receive(const std::string& port) {
   return result;
 }
 
-typedef std::function<void(std::size_t)> callback;
+// Asynchronous writting operation.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
-                std::shared_ptr<T> message, const callback& handler = nullptr) {
+                std::shared_ptr<T> message,
+                const std::function<void(std::size_t)>& callback = nullptr) {
   assert(message->GetDescriptor());
 
   char buffer[2048] = {0};
@@ -121,7 +139,7 @@ void async_send(const std::string& host, const std::string& port,
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes sent");
 
-      if (handler) handler(bytes);
+      if (callback) callback(bytes);
 
     });
 
@@ -129,10 +147,11 @@ void async_send(const std::string& host, const std::string& port,
   io_service.run();
 }
 
-typedef std::function<void(const std::string&)> rcallback;
+// Asynchronous reading operation.
 template <typename T>
-void async_receive(const std::string& port, T* const message,
-                   const rcallback& handler = nullptr) {
+void async_receive(
+    const std::string& port, T* const message,
+    const std::function<void(const std::string&)>& callback = nullptr) {
   assert(message->GetDescriptor());
 
   char buffer[2048] = {0};
@@ -163,8 +182,8 @@ void async_receive(const std::string& port, T* const message,
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes received");
 
-      if (handler)
-        handler(std::string(buffer));
+      if (callback)
+        callback(std::string(buffer));
       else
         message->ParseFromString(std::string(buffer));
 

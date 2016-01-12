@@ -62,20 +62,16 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   std::shared_ptr<T> receive(const std::string& port);
 
   // Asynchronous operations
-  typedef std::function<void(std::size_t)> callback;
-
   template <typename T>
   void async_send(const std::string& host,
                   const std::string& port,
                   std::shared_ptr<T> message,
-                  const callback& handler = nullptr);
-
-  typedef std::function<void(const std::string&)> rcallback;
+                  const std::function<void(std::size_t)>& callback = nullptr);
 
   template <typename T>
   void async_receive(const std::string& host,
                      T * const message,
-                     const rcallback& handler = nullptr);
+                     const std::function<void(const std::string&)>& callback = nullptr);
 
 ```
 ##### Examples

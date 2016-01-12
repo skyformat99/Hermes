@@ -13,7 +13,6 @@ addons:
             - llvm-toolchain-precise-3.7
             - ubuntu-toolchain-r-test
         packages:
-            - clang-3.7
             - g++-5
             - gcc-5
             - wget
@@ -21,7 +20,6 @@ addons:
 
 compiler:
   - gcc
-  - clang
 
 before_install:
     - wget https://cmake.org/files/v3.4/cmake-3.4.0-Linux-x86_64.tar.gz --no-check-certificate
@@ -35,13 +33,12 @@ before_install:
     - wget http://sourceforge.net/projects/boost/files/boost/1.59.0/boost_1_59_0.tar.gz
     - tar xvf boost_1_59_0.tar.gz
     - cd boost_1_59_0
-    - ./bootstrap.sh
+    - ./bootstrap.sh --prefix=/home/travis
     - ./b2 install
     - cd -
 
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
-    - if [ "$CXX" = "clang++" ]; then export CXX="clang++-3.7" CC="clang-3.7"; fi
 
 before_script:
     - echo $CC

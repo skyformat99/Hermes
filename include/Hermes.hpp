@@ -41,15 +41,13 @@ inline void change_n_bit(unsigned char* c, int n, int value) {
 template <class A, class... B>
 void do_after(unsigned int seconds, bool async, A&& a, B&&... b) {
   std::function<typename std::result_of<A(B...)>::type()> task(
-    std::bind(std::forward<A>(a), std::forward<B>(b)...)
-  );
+      std::bind(std::forward<A>(a), std::forward<B>(b)...));
   if (async) {
-    std::thread([seconds, task](){
-      std::this_thread::sleep_for(std::chrono::seconds(seconds));
-      task();
-    }).detach();
-  }
-  else {
+    std::thread([seconds, task]() {
+                  std::this_thread::sleep_for(std::chrono::seconds(seconds));
+                  task();
+                }).detach();
+  } else {
     std::this_thread::sleep_for(std::chrono::seconds(seconds));
     task();
   }
@@ -71,9 +69,6 @@ void do_after(unsigned int seconds, bool async, A&& a, B&&... b) {
 *
 */
 enum socket_state { UNUSED = 0, READING, WRITTING };
-
-typedef std::function<void(std::size_t)> callback;
-typedef std::function<void(const std::string&)> rcallback;
 typedef asio::basic_waitable_timer<std::chrono::system_clock> deadline_timer;
 
 template <class T>
@@ -157,9 +152,11 @@ class Software {
   virtual void disconnect() = 0;
   virtual std::string receive() = 0;
   virtual std::size_t send(const std::string&);
-  virtual void async_send(const std::string&,
-                          const callback& handler = nullptr) = 0;
-  virtual void async_receive(const rcallback& handler = nullptr) = 0;
+  virtual void async_send(
+      const std::string&,
+      const std::function<void(std::size_t)>& callback = nullptr) = 0;
+  virtual void async_receive(
+      const std::function<void(const std::string&)>& callback = nullptr) = 0;
 };
 
 class Messenger {
@@ -239,22 +236,24 @@ class Messenger {
   std::string receive() { return messenger_->receive(); }
   std::size_t send(const std::string& msg) { return messenger_->send(msg); }
 
-  void async_send(const std::string& msg, const callback& handler = nullptr) {
-    messenger_->async_send(msg, handler);
+  void async_send(const std::string& msg,
+                  const std::function<void(std::size_t)>& callback = nullptr) {
+    messenger_->async_send(msg, callback);
   }
 
-  void async_receive(const rcallback& handler = nullptr) {
-    messenger_->async_receive(handler);
+  void async_receive(
+      const std::function<void(const std::string&)>& callback = nullptr) {
+    messenger_->async_receive(callback);
   }
 };
-
 
 /**
 * Module: serialization - namespace protobuf
 *
 * @description:
 *   Contains Hermes protobuf operations.
-*   Allows user to send/receive a serialized version of theirs protobuf messages.
+*   Allows user to send/receive a serialized version of theirs protobuf
+*messages.
 *
 * @required:
 *   Define Google .proto model.
@@ -339,7 +338,8 @@ std::shared_ptr<T> receive(const std::string& port) {
 // Asynchronous writting operation.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
-                std::shared_ptr<T> message, const callback& handler = nullptr) {
+                std::shared_ptr<T> message,
+                const std::function<void(std::size_t)>& callback = nullptr) {
   assert(message->GetDescriptor());
 
   char buffer[2048] = {0};
@@ -371,7 +371,7 @@ void async_send(const std::string& host, const std::string& port,
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes sent");
 
-      if (handler) handler(bytes);
+      if (callback) callback(bytes);
 
     });
 
@@ -381,8 +381,9 @@ void async_send(const std::string& host, const std::string& port,
 
 // Asynchronous reading operation.
 template <typename T>
-void async_receive(const std::string& port, T* const message,
-                   const rcallback& handler = nullptr) {
+void async_receive(
+    const std::string& port, T* const message,
+    const std::function<void(const std::string&)>& callback = nullptr) {
   assert(message->GetDescriptor());
 
   char buffer[2048] = {0};
@@ -413,8 +414,8 @@ void async_receive(const std::string& port, T* const message,
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes received");
 
-      if (handler)
-        handler(std::string(buffer));
+      if (callback)
+        callback(std::string(buffer));
       else
         message->ParseFromString(std::string(buffer));
 
