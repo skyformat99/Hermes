@@ -35,7 +35,7 @@ before_install:
     - wget http://sourceforge.net/projects/asio/files/asio/1.10.6%20%28Stable%29/boost_asio_1_10_6.tar.gz/download
     - mv download asio-1.10.6.tar.gz
     - tar xvf asio-1.10.6.tar.gz
-    - cd asio-1.10.6
+    - cd boost_asio_1_10_6
     - ./configure
     - sudo make install
     - cd -

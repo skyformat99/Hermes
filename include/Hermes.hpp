@@ -56,6 +56,20 @@ void do_after(unsigned int seconds, bool async, A&& a, B&&... b) {
 }
 }  // namespace Ability
 
+/**
+*   Module - Messenger
+*
+*   @description:
+*     A global entity which allows you to create network softwares. A messenger
+*     could be a client or a server and it handles natively TCP/UDP protocol
+*     as well as asynchronous operations.
+*
+*  @required:
+*   - asio 1.10.6.
+*
+*
+*
+*/
 enum socket_state { UNUSED = 0, READING, WRITTING };
 
 typedef std::function<void(std::size_t)> callback;
