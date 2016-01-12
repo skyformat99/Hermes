@@ -26,11 +26,18 @@ compiler:
 before_install:
     - wget https://cmake.org/files/v3.4/cmake-3.4.0-Linux-x86_64.tar.gz --no-check-certificate
     - tar -xzvf cmake-3.4.0-Linux-x86_64.tar.gz
-    - wget http://sourceforge.net/projects/asio/files/asio/1.10.6%20%28Stable%29/boost_asio_1_10_6.tar.gz/download
-    - mv download asio-1.10.6.tar.gz
+    - wget https://github.com/google/protobuf/releases/download/v3.0.0-beta-2/protobuf-cpp-3.0.0-beta-2.tar.gz
+    - tar xzvf protobuf-cpp-3.0.0-beta-2.tar.gz
+    - cd  protobuf-3.0.0-beta-2
+    - ./configure
+    - sudo make install
+    - cd -
+    - wget https://01.org/sites/default/files/asio-1.10.6.tar.gz
     - tar xvf asio-1.10.6.tar.gz
-    - ls
-    - ls boost_asio_1_10_6
+    - cd asio-1.10.6
+    - ./configure
+    - sudo make install
+    - cd -
 
 install:
     - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
