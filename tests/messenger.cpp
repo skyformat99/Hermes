@@ -4,9 +4,9 @@
 #include <assert.h>
 
 #include "Hermes.hpp"
+#include "Communication.pb.h"
 
 using namespace Hermes;
-using namespace asio::ip;
 
 void test_session() {
   asio::io_context io_service;
@@ -40,10 +40,30 @@ void test_stream() {
   assert(stream->session().is_socket_unused());
 }
 
-void test_messenger_constructor()
+void test_messenger_client()
 {
-  assert(std::make_shared<Hermes::Messenger>("client", "tcp", true, "8080"));
-  assert(new Hermes::Messenger("client", "udp", true, "4444", "192.168.1.78"));
+  auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
+  assert(client);
+  client->run();
+  client->send("it works :)");
+  auto response = client->receive() ;
+  std::cout << response << "\n";
 
-  auto toto = std::make_shared<Messenger>("1", "2", true, "3")->get_messenger();
+  std::thread uno([&](){
+      client->async_receive([](const std::string& response){
+        std::cout << "DEBUG: " << response << "\n";
+      });
+  });
+
+  std::thread dos([&](){
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    client->async_send(" StarK! ", [](std::size_t bytes){
+      std::cout << "message sent. number of bytes: " + bytes;
+    });
+  });
+
+  std::this_thread::sleep_for(std::chrono::seconds(2));
+  client->disconnect();
+  uno.join();
+  dos.join();
 }

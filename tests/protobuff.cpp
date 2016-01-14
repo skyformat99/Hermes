@@ -15,7 +15,6 @@ void send_routine(std::shared_ptr<com::Message> message) {
   message->SerializeToString(&serialized);
   auto size = protobuf::send<com::Message>("127.0.0.1", "8246", message);
   assert(size == serialized.size());
-  std::cout << "message sent :)" << "\n";
 }
 
 void receive_routine() {
@@ -25,7 +24,6 @@ void receive_routine() {
   assert(test->from() == "from");
   assert(test->to() == "to");
   assert(test->msg() == "msg");
-  std::cout << "response received :)" << "\n";
 }
 
 void test_protobuf_synchronous_operations() {
@@ -62,7 +60,6 @@ void test_protobuf_asynchronous_operations() {
       assert(response->from() == "from: ok");
       assert(response->to() == "to: ok");
       assert(response->msg() == "msg: ok");
-      std::cout << "string received: " << res << "\n";
     });
   });
 
@@ -70,11 +67,23 @@ void test_protobuf_asynchronous_operations() {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     protobuf::async_send<com::Message>("127.0.0.1", "25555", message,
                                        [&](std::size_t bytes) {
-
-      std::cout << "bytes sent: " << bytes << "\n";
-    });
+       assert(bytes == 49);
+      });
   });
 
   thread_send.join();
   thread_receive.join();
+}
+
+
+void test_netcat() {
+  auto message = std::make_shared<com::Message>();
+
+  message->set_name("name: ok");
+  message->set_object("object: ok");
+  message->set_from("from: ok");
+  message->set_to("to: ok");
+  message->set_msg("msg: ok");
+
+  protobuf::send<com::Message>("127.0.0.1", "6666", message);
 }
