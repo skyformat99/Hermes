@@ -1,9 +1,6 @@
 # Minimum cmake version required
 cmake_minimum_required(VERSION 3.2.0 FATAL_ERROR)
 
-cmake_policy(SET CMP0042 NEW)
-cmake_policy(SET CMP0037 OLD)
-
 # Project name
 set(PROJECT Hermes)
 
