@@ -84,6 +84,8 @@ class Session {
     return options_.find(name) != options_.end() ? options_[name] : false;
   }
 
+  std::string get_heartbeat_message() const { return heartbeat_message_ ; }
+
  private:
   T& socket_;
   socket_state state_;
@@ -197,7 +199,10 @@ class Client : public Software {
   }
 
   void disconnect() {
-    if (connected_) stream_->close();
+    if (connected_) {
+      stream_->close();
+      connected_ = false;
+    }
   }
 
   size_t send(const std::string& message) {

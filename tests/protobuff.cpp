@@ -27,6 +27,7 @@ void receive_routine() {
 }
 
 void test_protobuf_synchronous_operations() {
+  std::cout << "testing synchronous operations [protobuf]" << std::endl;
   auto message = std::make_shared<com::Message>();
 
   message->set_name("name");
@@ -39,9 +40,11 @@ void test_protobuf_synchronous_operations() {
   std::thread thread_send(send_routine, message);
   thread_send.join();
   thread_receive.join();
+  std::cout << "-> test synchronous operations [ok]." << std::endl;
 }
 
 void test_protobuf_asynchronous_operations() {
+  std::cout << "testing asynchronous operations [protobuf]" << std::endl;
   auto message = std::make_shared<com::Message>();
   auto response = std::make_shared<com::Message>();
 
@@ -73,17 +76,5 @@ void test_protobuf_asynchronous_operations() {
 
   thread_send.join();
   thread_receive.join();
-}
-
-
-void test_netcat() {
-  auto message = std::make_shared<com::Message>();
-
-  message->set_name("name: ok");
-  message->set_object("object: ok");
-  message->set_from("from: ok");
-  message->set_to("to: ok");
-  message->set_msg("msg: ok");
-
-  protobuf::send<com::Message>("127.0.0.1", "6666", message);
+  std::cout << "-> test asynchronous operations [ok]." << std::endl;
 }
