@@ -16,7 +16,7 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 - Modules:
     Hermes is split into modules, you do not have to use all features if you do not want to.
-    That's why you will find them into repository include/modules, and just include the desired one.
+    That's why, you will find them into the repository include/modules.
 
 ## Modules
   It is quite simple. Go to include/modules and choose the wanted module.
@@ -44,7 +44,7 @@ Here, i want to point the 'structured data', that means we clearly have to use a
 
 So for obvious reasons, Hermes network operations about protobuf will always use TCP protocol.
 
-One more thing, as you should know, using protobuf involves having defined a .proto model and generate according classes. So let's assume that our protobuf package and message model are respectively named 'package' and 'message'...I know i'm quite imaginative :)
+One more thing, as you should know, using protobuf involves having defined a .proto model and generated according classes. So let's assume that our protobuf package and message model are respectively named 'package' and 'message'...I know i'm quite imaginative :)
 
   If you do need help about using protobuf : [`Google Protocol Buffers doc`](https://developers.google.com/protocol-buffers/?hl=en)
 
@@ -74,7 +74,7 @@ One more thing, as you should know, using protobuf involves having defined a .pr
                      const std::function<void(const std::string&)>& callback = nullptr);
 
 ```
-##### Examples
+##### Desgign - Examples
 
 - Example 1: Synchronous send/receive operations.
 
@@ -124,11 +124,10 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   // We start by declaring our protobuf message
   auto message = std::make_shared<package::message>();
 
-  // Asynchronous send of a serialized version of our message without providing callback.
+  // Without providing callback.
   protobuf::async_send("127.0.0.1", "8080", message);
 
-  // Asynchronous send of a serialized version of our message with callback
-  // given as lambda in parameters.
+  // With callback given as lambda in parameters.
   protobuf::async_send("127.0.0.1", "8080", message, [](std::size_t bytes){
 
     std::cout << "bytes sent: " << bytes << "\n";
@@ -162,5 +161,5 @@ One more thing, as you should know, using protobuf involves having defined a .pr
 }
 
 ```
-I hope these examples will help. Take a look to the protobuf tests, it may be usefull
+I hope this design overview will help. Take a look to the protobuf tests, it may be usefull
 [`protobuf test`](https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp).

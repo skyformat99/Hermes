@@ -20,8 +20,8 @@ using namespace asio::ip;
 *
 * @description:
 *   Contains Hermes protobuf operations.
-*   Allows user to send/receive a serialized version of theirs protobuf
-*messages.
+*   Allows user to send/receive a serialized version of their protobuf
+*   messages.
 *
 * @required:
 *   Define Google .proto model.
@@ -55,7 +55,8 @@ std::size_t send(const std::string& host, const std::string& port,
 
   if (error) {
     socket.close();
-    throw asio::system_error(error);
+    throw std::runtime_error("[protobuf] Connection to host: " + host +
+                             " port: " + port + " failed.");
   }
 
   asio::write(socket, asio::buffer(buffer, serialized.size()), error);
@@ -82,9 +83,8 @@ std::shared_ptr<T> receive(const std::string& port) {
   if (error) {
     acceptor.close();
     socket.close();
-    throw std::runtime_error(
-        "[protobuf] Unexpected error occurred: acceptor failed to accept "
-        "socket.");
+    throw std::runtime_error("[protobuf] Accepting connection on port: " +
+                             port + " failed.");
   }
 
   socket.read_some(asio::buffer(buffer), error);
@@ -123,7 +123,8 @@ void async_send(const std::string& host, const std::string& port,
 
     if (error) {
       socket.close();
-      throw std::system_error(error);
+      throw std::runtime_error("[protobuf] Connection to host: " + host +
+                               " port: " + port + " failed.");
     }
 
     std::strcpy(buffer, serialized.c_str());
@@ -166,7 +167,8 @@ void async_receive(
     if (error) {
       acceptor.close();
       socket.close();
-      throw asio::system_error(error);
+      throw std::runtime_error("[protobuf] Accepting connection on port: " +
+                               port + " failed.");
     }
 
     asio::async_read(socket, asio::buffer(buffer, 2048),

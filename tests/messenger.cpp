@@ -95,32 +95,19 @@ void test_stream() {
   std::cout << "-> test stream [ok]." << std::endl;
 }
 
-void test_messenger_tcp_client()
+void test_tcp_protocol()
 {
   std::cout << "testing tcp client [Messenger]" << std::endl;
   auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
   assert(client);
-  client->run();
-  client->send("it works :)");
-  auto response = client->receive() ;
-  std::cout << response << "\n";
-
-  std::thread uno([&](){
-      client->async_receive([](const std::string& response){
-        std::cout << "DEBUG: " << response << "\n";
-      });
-  });
-
-  std::thread dos([&](){
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    client->async_send(" StarK! ", [](std::size_t bytes){
-      std::cout << "message sent. number of bytes: " + bytes;
-    });
-  });
-
-  std::this_thread::sleep_for(std::chrono::seconds(2));
-  client->disconnect();
-  uno.join();
-  dos.join();
   std::cout << "-> test tcp client [ok]." << std::endl;
+
+  std::cout << "testing tcp server [Messenger]" << std::endl;
+  auto server = new Messenger("server", "udp", false, "7777");
+  assert(server);
+  std::cout << "-> test tcp server [ok]." << std::endl;
+}
+
+void test_udp_protocol() {
+
 }
