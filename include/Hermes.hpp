@@ -479,6 +479,12 @@ class Messenger {
 *   Define Google .proto model.
 *   Generate according classes with protoc binary.
 *
+*
+* @threadsafe:
+*  All asio's network variables belong to their scope function so, many threads
+*  could do multiple calls in the same time to Hermes protobuf operations. No unknown
+*  behavior will happen.
+*
 * @protocol:
 *   TCP
 */
@@ -489,8 +495,8 @@ using namespace google::protobuf;
 // Synchronous writting operation.
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
-                 std::shared_ptr<T> message) {
-  assert(message->GetDescriptor());
+                 const T& message) {
+  assert(message.GetDescriptor());
 
   std::string serialized;
   char buffer[2048] = {0};
@@ -501,7 +507,7 @@ std::size_t send(const std::string& host, const std::string& port,
   tcp::socket socket(io_service);
   auto endpoint = resolver.resolve(tcp::resolver::query(host, port));
 
-  message->SerializeToString(&serialized);
+  message.SerializeToString(&serialized);
   std::strcpy(buffer, serialized.c_str());
   asio::connect(socket, endpoint, error);
 
@@ -512,6 +518,7 @@ std::size_t send(const std::string& host, const std::string& port,
   }
 
   asio::write(socket, asio::buffer(buffer, serialized.size()), error);
+
   if (error) {
     socket.close();
     throw asio::system_error(error);
@@ -521,7 +528,8 @@ std::size_t send(const std::string& host, const std::string& port,
 
 // Synchronous reading operation.
 template <typename T>
-std::shared_ptr<T> receive(const std::string& port) {
+T receive(const std::string& port) {
+  assert(std::stoi(port));
   asio::error_code error;
   char buffer[2048] = {0};
   asio::io_context io_service;
@@ -550,17 +558,17 @@ std::shared_ptr<T> receive(const std::string& port) {
     throw asio::system_error(error);
   }
 
-  auto result = std::make_shared<T>();
-  result->ParseFromString(std::string(buffer));
+  T result;
+  result.ParseFromString(std::string(buffer));
   return result;
 }
 
 // Asynchronous writting operation.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
-                std::shared_ptr<T> message,
+                const T& message,
                 const std::function<void(std::size_t)>& callback = nullptr) {
-  assert(message->GetDescriptor());
+  assert(message.GetDescriptor());
 
   char buffer[2048] = {0};
   std::string serialized;
@@ -568,7 +576,7 @@ void async_send(const std::string& host, const std::string& port,
 
   tcp::socket socket(io_service);
   tcp::resolver resolver(io_service);
-  message->SerializeToString(&serialized);
+  message.SerializeToString(&serialized);
   auto endpoint = resolver.resolve(tcp::resolver::query(host, port));
   socket.async_connect(endpoint->endpoint(),
                        [&](const asio::error_code& error) {
@@ -593,20 +601,16 @@ void async_send(const std::string& host, const std::string& port,
             "[protobuf] Unexpected error occurred: 0 bytes sent");
 
       if (callback) callback(bytes);
-
     });
 
   });
-  io_service.run();
 }
 
 // Asynchronous reading operation.
 template <typename T>
-void async_receive(
-    const std::string& port, T* const message,
-    const std::function<void(const std::string&)>& callback = nullptr) {
-  assert(message->GetDescriptor());
-
+void async_receive(const std::string& port,
+                   const std::function<void(T)>& callback) {
+  assert(callback);
   char buffer[2048] = {0};
   asio::io_context io_service;
 
@@ -636,15 +640,12 @@ void async_receive(
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes received");
 
-      if (callback)
-        callback(std::string(buffer));
-      else
-        message->ParseFromString(std::string(buffer));
-
+      T response;
+      response.ParseFromString(std::string(buffer));
+      callback(response);
     });
 
   });
-  io_service.run();
 }
 
 }  // namespace protobuf

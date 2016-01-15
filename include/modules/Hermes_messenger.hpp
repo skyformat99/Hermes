@@ -84,7 +84,7 @@ class Session {
     return options_.find(name) != options_.end() ? options_[name] : false;
   }
 
-  std::string get_heartbeat_message() const { return heartbeat_message_ ; }
+  std::string get_heartbeat_message() const { return heartbeat_message_; }
 
  private:
   T& socket_;
@@ -205,7 +205,7 @@ class Client : public Software {
     }
   }
 
-  size_t send(const std::string& message) {
+  std::size_t send(const std::string& message) {
     if (not connected_)
       throw std::logic_error(
           "[Messenger] Client is not connected. Call 'run' method once "
@@ -257,7 +257,7 @@ class Client : public Software {
 
     if (not async_) {
       std::cerr << "[Messenger] Error: Synchronous Client cannot perform";
-      std::cerr << " asynchronous operations\n";
+      std::cerr << " asynchronous operations" << std::endl;
       return;
     }
 
@@ -294,7 +294,7 @@ class Client : public Software {
 
     if (not async_) {
       std::cerr << "[Messenger] Error: Synchronous Client cannot perform";
-      std::cerr << " asynchronous operations\n";
+      std::cerr << " asynchronous operations" << std::endl;
       return;
     }
 
@@ -302,24 +302,55 @@ class Client : public Software {
     char buffer[2048] = {0};
 
     stream_->socket().async_receive(
-          asio::buffer(buffer, 2048),
-          [&](const asio::error_code& error, std::size_t bytes) {
-        if (error and error != asio::error::eof) {
-          stream_->close();
-          throw asio::system_error(error);
-        }
+        asio::buffer(buffer, 2048),
+        [&](const asio::error_code& error, std::size_t bytes) {
+          if (error and error != asio::error::eof) {
+            stream_->close();
+            throw asio::system_error(error);
+          }
 
-        if (not bytes or std::string(buffer).empty()) {
-          stream_->close();
-          throw std::runtime_error(
-            "[Messenger] Unexpected error occurred. async_receive failed."
-          );
-        }
+          if (not bytes or std::string(buffer).empty()) {
+            stream_->close();
+            throw std::runtime_error(
+                "[Messenger] Unexpected error occurred. async_receive failed.");
+          }
 
-        if (callback) callback(std::string(buffer));
-        // std::cout << std::string(buffer) << "\n";
-    });
+          if (callback) callback(std::string(buffer));
+          // std::cout << std::string(buffer) << "\n";
+        });
   }
+};
+
+template <typename T>
+class Server : public Software {
+public:
+  Server(asio::io_context& io_service, const std::string& port, bool async)
+      : async_(async),
+        port_(port),
+        connected_(false),
+        io_service_(io_service),
+        stream_(Stream<typename T::socket>::create(io_service)) {}
+
+  Server(const Server&) = delete;
+  Server& operator=(const Server&) = delete;
+
+  ~Server() { disconnect(); }
+
+ private:
+  bool async_;
+  std::string port_;
+  std::atomic<bool> connected_;
+  asio::io_context& io_service_;
+  typename Stream<typename T::socket>::instance stream_;
+
+public:
+  void run() {}
+  void disconnect() {}
+  std::string receive() { return ""; }
+  std::size_t send(const std::string& message) { return 4; }
+  void async_send(const std::string& message,
+                  const std::function<void(std::size_t)>& callback = nullptr) {}
+  void async_receive(const std::function<void(const std::string&)>& callback = nullptr) {}
 };
 
 class Messenger {
@@ -396,10 +427,15 @@ class Messenger {
         messenger_ = std::make_unique<Client<asio::ip::udp>>(io_service_, host,
                                                              port, async_);
         break;
+
       case TCP_SERVER:
+        messenger_ = std::make_unique<Server<asio::ip::tcp>>(io_service_, port,
+                                                            async_);
         break;
 
       case UDP_SERVER:
+        messenger_ = std::make_unique<Server<asio::ip::udp>>(io_service_, port,
+                                                             async_);
         break;
 
       default:

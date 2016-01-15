@@ -25,7 +25,7 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 
 - serialization:
   - [`protobuf`](https://github.com/google/protobuf)
-  - [`flatbuffer`](https://github.com/google/flatbuffers)
+  - [`flatbuffers`](https://github.com/google/flatbuffers)
 
   Above, the serialization protocols handled by Hermes.
 
@@ -38,7 +38,7 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 - c++11
 
 The following libraries are required to use all Hermes features but they are included into Hermes repository if you do not have them.
-- Asio without-boost
+- Asio 1.10.6
 - Google Protocol Buffers
 - Google FlatBuffers
 
@@ -54,12 +54,17 @@ Hermes is a header only library, so there is nothing to build and to link with y
 
 ## Documentation
 
-You will find a full commmented documentation, including several examples, here [`Hermes Doc`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md).
+You will find a full commmented design documentation, including several examples, here [`Hermes Design`](https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md).
 
 
 ## Build status
 
 - Travis: [![Build Status](https://travis-ci.org/TommyStarK/Hermes.svg?branch=master)](https://travis-ci.org/TommyStarK/Hermes)
+
+module stability:
+- protobuf: implemented, tested and functionnal.
+- flatbuffers: not implemented yet.
+- messenger: actively developed.
 
 
 ## Contribution

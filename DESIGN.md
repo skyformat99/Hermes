@@ -5,10 +5,10 @@ Let's begin with an overview of Hermes core functionalities.
 
 Hermes has three different parts:
 - Messenger:
-    A global entity which allows you to create network softwares. A messenger could be a client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
+    A global entity which allows you to create a network software. A messenger could be a client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
 
 - Serialization:
-    Hermes is a fast and easy way to send and receive serialized data through socket.
+    Hermes is a, fast and easy, way to send and receive serialized data through a socket.
     Thanks to Google Protocol Buffers and FlatBuffers, Hermes could send/receive serialized
     data.
 
@@ -18,17 +18,10 @@ Note: JSON is not handled by default, because all famous library has a to_string
     Hermes is split into modules, you do not have to use all features if you do not want to.
     That's why, you will find them into the repository include/modules.
 
-## Modules
-  It is quite simple. Go to include/modules and choose the wanted module.
-  You just have to include it.
 
-  - Example:
+## Messenger
+  Incoming.
 
-  ```c++
-    // For example, i just need to send/receive protobuf message through socket
-    #include "Hermes_protobuf.hpp"
-  ```
-  Note: All modules are in namespace 'Hermes'.
 
 
 ## Serialization
@@ -44,7 +37,7 @@ Here, i want to point the 'structured data', that means we clearly have to use a
 
 So for obvious reasons, Hermes network operations about protobuf will always use TCP protocol.
 
-One more thing, as you should know, using protobuf involves having defined a .proto model and generated according classes. So let's assume that our protobuf package and message model are respectively named 'package' and 'message'...I know i'm quite imaginative :)
+One more thing, as you should know, using protobuf involves to having defined a .proto model and generated according classes. So let's assume that our protobuf package and message model are respectively named 'package' and 'message'...I know i'm quite imaginative :)
 
   If you do need help about using protobuf : [`Google Protocol Buffers doc`](https://developers.google.com/protocol-buffers/?hl=en)
 
@@ -56,22 +49,21 @@ One more thing, as you should know, using protobuf involves having defined a .pr
   template <typename T>
   std::size_t send(const std::string& host,
                    const std::string& port,
-                   std::shared_ptr<T> message);
+                   const T& message);
 
   template <typename T>
-  std::shared_ptr<T> receive(const std::string& port);
+  T receive(const std::string& port);
 
   // Asynchronous operations
   template <typename T>
   void async_send(const std::string& host,
                   const std::string& port,
-                  std::shared_ptr<T> message,
+                  const T& message,
                   const std::function<void(std::size_t)>& callback = nullptr);
 
   template <typename T>
-  void async_receive(const std::string& host,
-                     T * const message,
-                     const std::function<void(const std::string&)>& callback = nullptr);
+  void async_receive(const std::string& port,
+                     const std::function<void(T)>& callback);
 
 ```
 ##### Desgign - Examples
@@ -82,30 +74,28 @@ One more thing, as you should know, using protobuf involves having defined a .pr
 {
   #include "Hermes.hpp"
 
-  #include <string>
-  #include <memory>
+  #include <string
   #include <iostream>
 
   using namespace Hermes;
 
-  // we start by declaring our protobuf message
-  auto message = std::make_shared<package::message>();
+  package::message message;
 
-  // Once data set, we could send it.
+  // set data to message
+
   auto size = protobuf::send<package::message>("127.0.0.1", "8080", message);
 
-  // 'send' function returns 0 on error and the number of bytes sent on success.
+  // 'send' function returns 0 on error, and the number of bytes sent on success.
   if (not size)
     std::cerr << "Error :(" << std::endl;
   else
     std::cout << "Message sent :)" << std::endl;
 
-  // Similarly, if you want to receive a protobuf message
+
   auto response = protobuf::receive<package::message>("8080");
 
-  // Do some stuff with our protobuf
-  auto descriptor = response->GetDescriptor();
-
+  // Do stuff with response
+  auto descriptor = response.GetDescriptor();
 }
 
 ```
@@ -121,45 +111,54 @@ One more thing, as you should know, using protobuf involves having defined a .pr
 
   using namespace Hermes;
 
-  // We start by declaring our protobuf message
-  auto message = std::make_shared<package::message>();
+  package::message message;
 
-  // Without providing callback.
-  protobuf::async_send("127.0.0.1", "8080", message);
+  // set data to message.
 
-  // With callback given as lambda in parameters.
-  protobuf::async_send("127.0.0.1", "8080", message, [](std::size_t bytes){
+  // Asynchronous sending without providing callback.
+  protobuf::async_send<package::message>("127.0.0.1", "8080", message);
+
+  // With callback given as lambda.
+  protobuf::async_send<package::message>("127.0.0.1", "8080", message,
+                                          [](std::size_t bytes) {
 
     std::cout << "bytes sent: " << bytes << "\n";
     // do some stuff
   });
 
-  // Predict ending of asynchronous operations is impossible that's why 'async_send' cannot  
-  // return a std::shared_ptr like its counterpart 'send'.
-  // For this reason, you have to provide a raw pointer of a protobuf message using get() method
-  // of std::shared_ptr to 'async_receive'.
-  // There are two cases. First, you do not provide a callback, the protobuf message
-  // parses the string received when the internal asynchronous handler is called by
-  // the receive operation. If you provide one, you could do the parsing in your function.
 
-  auto response = std::make_shared<package::message>();
 
-  protobuf::async_receive("8080", response);
+  protobuf::async_receive<package::message>("8080", [](com::Message response) {
 
-  // We want to check if we get a response, so i will ask if one of my message fields is empty.
-  // In my .proto model, message is defined with a field named 'name' and represented by a string
-  // So i could do:
-  if (response->name().empty())
-    std::cout << "response not receive yet" << "\n";
-
-  protobuf::async_receive("8080", response [](const std::string& res){
-
-    response->ParseFromString(res);
-    // do some stuff
+      // do some stuff
+      auto descriptor = response.GetDescriptor();
   });
 
 }
 
 ```
-I hope this design overview will help. Take a look to the protobuf tests, it may be usefull
+Take a look to the protobuf tests, it may be usefull:
 [`protobuf test`](https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp).
+
+
+#### flatbuffers
+Inconming.
+
+
+
+## Modules
+
+  In the repository include/modules, you will find the following modules:
+  - Hermes_protobuf.hpp
+  - Hermes_messenger.hpp
+  - Hermes_flatbuffers.hpp
+
+  A module works as Hermes. The modules are headers only so, you just have to
+  include the desired one to use it.
+
+  ```c++
+    // For example, i just want to use the Hermes protobuf operations.
+    #include "Hermes_protobuf.hpp"
+  ```
+
+  Note: All modules are in namespace 'Hermes'.
