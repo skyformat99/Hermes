@@ -29,7 +29,8 @@ using namespace asio::ip;
 *
 * @threadsafe:
 *  All asio's network variables belong to their scope function so, many threads
-*  could do multiple calls in the same time to Hermes protobuf operations. No unknown
+*  could do multiple calls in the same time to Hermes protobuf operations. No
+*unknown
 *  behavior will happen.
 *
 * @protocol:

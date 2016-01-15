@@ -124,16 +124,28 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
 class Software {
  public:
   virtual ~Software() {}
-  virtual void run() = 0;
-  virtual void disconnect() = 0;
+  virtual void run(const std::function<void()>& callback = nullptr) = 0;
+  virtual void disconnect(const std::function<void()>& callback = nullptr) = 0;
   virtual std::string receive() = 0;
   virtual std::size_t send(const std::string&) = 0;
+  virtual void async_receive(const std::function<void(std::string)>&) = 0;
   virtual void async_send(
       const std::string&,
       const std::function<void(std::size_t)>& callback = nullptr) = 0;
-  virtual void async_receive(
-      const std::function<void(const std::string&)>& callback = nullptr) = 0;
+
+  void set_connection_handler(const std::function<void()>& callback) {
+    connect_handler_ = callback;
+  }
+
+  void set_disconnection_handler(const std::function<void()>& callback) {
+    disconnect_handler_ = callback;
+  }
+
+ protected:
+  std::function<void()> connect_handler_;
+  std::function<void()> disconnect_handler_;
 };
+
 
 template <typename T>
 class Client : public Software {
@@ -145,7 +157,10 @@ class Client : public Software {
         port_(port),
         connected_(false),
         io_service_(io_service),
-        stream_(Stream<typename T::socket>::create(io_service)) {}
+        stream_(Stream<typename T::socket>::create(io_service)) {
+    set_connection_handler(nullptr);
+    set_disconnection_handler(nullptr);
+  }
 
   Client(const Client&) = delete;
   Client& operator=(const Client&) = delete;
@@ -163,7 +178,7 @@ class Client : public Software {
   typename Stream<typename T::socket>::instance stream_;
 
  public:
-  void run() {
+  void run(const std::function<void()>& callback = nullptr) {
     if (connected_)
       throw std::logic_error(
           "[Messenger] Error: Client already connected to: " + host_ + ":" +
@@ -178,30 +193,39 @@ class Client : public Software {
     if (not async_) {
       stream_->socket().connect(endpoint);
       connected_ = true;
-      io_service_.run();
       return;
     }
 
-    stream_->socket().async_connect(endpoint,
-                                    [this](const asio::error_code& error) {
+    stream_->socket().async_connect(
+        endpoint, [this, &callback](const asio::error_code& error) {
 
-      if (error) {
-        stream_->close();
-        throw std::runtime_error(" [Messenger] Connection to host: " + host_ +
-                                 " port: " + port_ + " failed.");
-      }
+          if (error) {
+            stream_->close();
+            throw std::runtime_error(" [Messenger] Connection to host: " +
+                                     host_ + " port: " + port_ + " failed.");
+          }
 
-      connected_ = true;
-    });
+          connected_ = true;
+          if (callback)
+            callback();
+          else if (connect_handler_)
+            connect_handler_();
+        });
 
     io_service_.run();
     return;
   }
 
-  void disconnect() {
+  void disconnect(const std::function<void()>& callback = nullptr) {
     if (connected_) {
-      stream_->close();
       connected_ = false;
+
+      if (callback)
+        callback();
+      else if (disconnect_handler_)
+        disconnect_handler_();
+      else
+        stream_->close();
     }
   }
 
@@ -266,8 +290,7 @@ class Client : public Software {
 
     std::strcpy(buffer, message.c_str());
     stream_->socket().async_send(asio::buffer(buffer, message.size()),
-                                 [this, callback, message](
-                                     const asio::error_code& error,
+                                 [&](const asio::error_code& error,
                                      std::size_t bytes) {
 
       if (error) {
@@ -285,8 +308,7 @@ class Client : public Software {
     });
   }
 
-  void async_receive(
-      const std::function<void(const std::string&)>& callback = nullptr) {
+  void async_receive(const std::function<void(std::string)>& callback) {
     if (not connected_)
       throw std::logic_error(
           "[Messenger] Client is not connected. Call 'run' method once "
@@ -315,26 +337,30 @@ class Client : public Software {
                 "[Messenger] Unexpected error occurred. async_receive failed.");
           }
 
-          if (callback) callback(std::string(buffer));
-          // std::cout << std::string(buffer) << "\n";
+          callback(std::string(buffer));
         });
   }
 };
 
 template <typename T>
 class Server : public Software {
-public:
+ public:
   Server(asio::io_context& io_service, const std::string& port, bool async)
       : async_(async),
         port_(port),
         connected_(false),
         io_service_(io_service),
-        stream_(Stream<typename T::socket>::create(io_service)) {}
+        stream_(Stream<typename T::socket>::create(io_service)) {
+    set_connection_handler(nullptr);
+    set_disconnection_handler(nullptr);
+  }
 
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
 
-  ~Server() { disconnect(); }
+  ~Server() {
+    if (connected_) disconnect();
+  }
 
  private:
   bool async_;
@@ -343,16 +369,31 @@ public:
   asio::io_context& io_service_;
   typename Stream<typename T::socket>::instance stream_;
 
-public:
-  void run() {}
-  void disconnect() {}
+ public:
+  void run(const std::function<void()>& callback = nullptr) {}
+  void disconnect(const std::function<void()>& callback = nullptr) {}
   std::string receive() { return ""; }
   std::size_t send(const std::string& message) { return 4; }
+  void async_receive(const std::function<void(std::string)>& callback) {}
   void async_send(const std::string& message,
                   const std::function<void(std::size_t)>& callback = nullptr) {}
-  void async_receive(const std::function<void(const std::string&)>& callback = nullptr) {}
 };
 
+/**
+* Messenger class allows you to create network software.
+*
+* @param:
+*     - software (client/server)
+*     - protocol (tcp/udp)
+*     - async
+*     - port
+*     - host (set by default to localhost)
+*
+* @see:
+*   design: https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*   exemples:
+*https://github.com/TommyStarK/Hermes/blob/master/tests/messenger.cpp
+*/
 class Messenger {
  public:
   Messenger(const std::string& software, const std::string& protocol,
@@ -378,6 +419,7 @@ class Messenger {
     *c = (*c | (1 << n)) & ((value << n) | ((~0) ^ (1 << n)));
   }
 
+  // handle options set from parsing parameters.
   int handle_options() {
     if (get_n_bit(&options_, 0) and get_n_bit(&options_, 2)) return TCP_CLIENT;
 
@@ -390,6 +432,17 @@ class Messenger {
     return NONE;
   }
 
+  // resolve software by parsing parameters and settings according bit
+  // of options_ to 1.
+  //
+  // @param:
+  //    software, protocol
+  //
+  // @design:
+  //    bit field: 76543210
+  //        * 0 = client   2 = tcp    4 = async
+  //        * 1 = server   3 = udp    5-7 = unused (future feature).
+  //    If according bit is set to 1, specification is required.
   void resolve_software(const std::string& software,
                         const std::string& protocol) {
     auto s = software;
@@ -414,28 +467,29 @@ class Messenger {
           "protocol tcp or udp.");
   }
 
+  // Init required network software
   void initialize_software(const std::string& host, const std::string& port) {
     int flag = handle_options();
 
     switch (flag) {
       case TCP_CLIENT:
-        messenger_ = std::make_unique<Client<asio::ip::tcp>>(io_service_, host,
+        messenger_ = std::make_shared<Client<asio::ip::tcp>>(io_service_, host,
                                                              port, async_);
         break;
 
       case UDP_CLIENT:
-        messenger_ = std::make_unique<Client<asio::ip::udp>>(io_service_, host,
+        messenger_ = std::make_shared<Client<asio::ip::udp>>(io_service_, host,
                                                              port, async_);
         break;
 
       case TCP_SERVER:
-        messenger_ = std::make_unique<Server<asio::ip::tcp>>(io_service_, port,
-                                                            async_);
+        messenger_ =
+            std::make_shared<Server<asio::ip::tcp>>(io_service_, port, async_);
         break;
 
       case UDP_SERVER:
-        messenger_ = std::make_unique<Server<asio::ip::udp>>(io_service_, port,
-                                                             async_);
+        messenger_ =
+            std::make_shared<Server<asio::ip::udp>>(io_service_, port, async_);
         break;
 
       default:
@@ -450,20 +504,33 @@ class Messenger {
   std::shared_ptr<Software> messenger_;
 
  public:
-  void run() { messenger_->run(); }
-  void disconnect() { messenger_->disconnect(); }
-  Software* get_messenger() { return messenger_.get(); }
-  std::string receive() { return messenger_->receive(); }
-  std::size_t send(const std::string& msg) { return messenger_->send(msg); }
+  void run(const std::function<void()>& callback = nullptr) {
+    messenger_->run(callback);
+  }
+
+  void disconnect(const std::function<void()>& callback = nullptr) {
+    messenger_->disconnect(callback);
+  }
+
+  void async_receive(const std::function<void(std::string)>& callback) {
+    messenger_->async_receive(callback);
+  }
 
   void async_send(const std::string& msg,
                   const std::function<void(std::size_t)>& callback = nullptr) {
     messenger_->async_send(msg, callback);
   }
 
-  void async_receive(
-      const std::function<void(const std::string&)>& callback = nullptr) {
-    messenger_->async_receive(callback);
+  Software* get_messenger() { return messenger_.get(); }
+  std::string receive() { return messenger_->receive(); }
+  std::size_t send(const std::string& msg) { return messenger_->send(msg); }
+
+  void set_connection_handler(const std::function<void()>& callback) {
+    messenger_->set_connection_handler(callback);
+  }
+
+  void set_disconnection_handler(const std::function<void()>& callback) {
+    messenger_->set_disconnection_handler(callback);
   }
 };
 
@@ -482,11 +549,17 @@ class Messenger {
 *
 * @threadsafe:
 *  All asio's network variables belong to their scope function so, many threads
-*  could do multiple calls in the same time to Hermes protobuf operations. No unknown
+*  could do multiple calls in the same time to Hermes protobuf operations. No
+*unknown
 *  behavior will happen.
 *
 * @protocol:
 *   TCP
+*
+* @see:
+*   design: https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*   exemples:
+*https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp
 */
 namespace protobuf {
 
