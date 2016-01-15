@@ -95,8 +95,7 @@ void test_stream() {
   std::cout << "-> test stream [ok]." << std::endl;
 }
 
-void test_tcp_protocol()
-{
+void test_tcp_protocol() {
   std::cout << "testing tcp client [Messenger]" << std::endl;
   auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
   assert(client);
@@ -110,7 +109,12 @@ void test_tcp_protocol()
 
 void test_udp_protocol() {
   std::cout << "testing udp client [Messenger]" << std::endl;
-  auto client = new Messenger("client", "udp", true, "6666", "127.0.0.1");
+  auto client = new Messenger("client", "udp", true, "9999", "127.0.0.1");
   assert(client);
-  std::cout << "-> test tcp client [ok]." << std::endl;
+  std::cout << "-> test udp client [ok]." << std::endl;
+
+  std::cout << "testing udp server [Messenger]" << std::endl;
+  auto server = new Messenger("server", "udp", true, "9999");
+  assert(server);
+  std::cout << "-> test udp server [ok]." << std::endl;
 }

@@ -1,20 +1,15 @@
 #pragma once
 
 #include <map>
-#include <ctime>
 #include <atomic>
 #include <chrono>
 #include <string>
-#include <thread>
 #include <memory>
 #include <iostream>
 #include <stdexcept>
 #include <algorithm>
 #include <functional>
 
-#include <assert.h>
-
-#include "google/protobuf/message.h"
 #include "asio.hpp"
 
 namespace Hermes {
@@ -145,6 +140,7 @@ class Software {
   std::function<void()> connect_handler_;
   std::function<void()> disconnect_handler_;
 };
+
 
 template <typename T>
 class Client : public Software {
@@ -377,4 +373,159 @@ class Server : public Software {
   void async_send(const std::string& message,
                   const std::function<void(std::size_t)>& callback = nullptr) {}
 };
-}  // namespace Hermes
+
+/**
+* Messenger class allows you to create network software.
+*
+* @param:
+*     - software (client/server)
+*     - protocol (tcp/udp)
+*     - async
+*     - port
+*     - host (set by default to localhost)
+*
+* @see:
+*   design: https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*   exemples:
+*https://github.com/TommyStarK/Hermes/blob/master/tests/messenger.cpp
+*/
+class Messenger {
+ public:
+  Messenger(const std::string& software, const std::string& protocol,
+            bool async, const std::string& port,
+            const std::string& host = "127.0.0.1")
+      : async_(async), options_(0) {
+    resolve_software(software, protocol);
+    initialize_software(host, port);
+  }
+
+  Messenger(const Messenger&) = delete;
+  Messenger& operator=(const Messenger&) = delete;
+  ~Messenger() {}
+
+ private:
+  // get nth bit of an unsigned char.
+  inline char get_n_bit(unsigned char* c, int n) {
+    return (*c & (1 << n)) ? 1 : 0;
+  }
+
+  // change nth bit of an unsigned char to the given value.
+  inline void change_n_bit(unsigned char* c, int n, int value) {
+    *c = (*c | (1 << n)) & ((value << n) | ((~0) ^ (1 << n)));
+  }
+
+  // handle options set from parsing parameters.
+  int handle_options() {
+    if (get_n_bit(&options_, 0) and get_n_bit(&options_, 2)) return TCP_CLIENT;
+
+    if (get_n_bit(&options_, 0) and get_n_bit(&options_, 3)) return UDP_CLIENT;
+
+    if (get_n_bit(&options_, 1) and get_n_bit(&options_, 2)) return TCP_SERVER;
+
+    if (get_n_bit(&options_, 1) and get_n_bit(&options_, 3)) return UDP_SERVER;
+
+    return NONE;
+  }
+
+  // resolve software by parsing parameters and settings according bit
+  // of options_ to 1.
+  //
+  // @param:
+  //    software, protocol
+  //
+  // @design:
+  //    bit field: 76543210
+  //        * 0 = client   2 = tcp    4 = async
+  //        * 1 = server   3 = udp    5-7 = unused (future feature).
+  //    If according bit is set to 1, specification is required.
+  void resolve_software(const std::string& software,
+                        const std::string& protocol) {
+    auto s = software;
+    auto p = protocol;
+
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    std::transform(p.begin(), p.end(), p.begin(), ::tolower);
+
+    if (s == "client") change_n_bit(&options_, 0, 1);
+
+    if (s == "server") change_n_bit(&options_, 1, 1);
+
+    if (p == "tcp") change_n_bit(&options_, 2, 1);
+
+    if (p == "udp") change_n_bit(&options_, 3, 1);
+
+    if (async_ == true) change_n_bit(&options_, 4, 1);
+
+    if (not options_)
+      throw std::invalid_argument(
+          "[Messenger] software has to be a client or a server and "
+          "protocol tcp or udp.");
+  }
+
+  // Init required network software
+  void initialize_software(const std::string& host, const std::string& port) {
+    int flag = handle_options();
+
+    switch (flag) {
+      case TCP_CLIENT:
+        messenger_ = std::make_shared<Client<asio::ip::tcp>>(io_service_, host,
+                                                             port, async_);
+        break;
+
+      case UDP_CLIENT:
+        messenger_ = std::make_shared<Client<asio::ip::udp>>(io_service_, host,
+                                                             port, async_);
+        break;
+
+      case TCP_SERVER:
+        messenger_ =
+            std::make_shared<Server<asio::ip::tcp>>(io_service_, port, async_);
+        break;
+
+      case UDP_SERVER:
+        messenger_ =
+            std::make_shared<Server<asio::ip::udp>>(io_service_, port, async_);
+        break;
+
+      default:
+        break;
+    }
+  }
+
+ private:
+  bool async_;
+  unsigned char options_;
+  asio::io_context io_service_;
+  std::shared_ptr<Software> messenger_;
+
+ public:
+  void run(const std::function<void()>& callback = nullptr) {
+    messenger_->run(callback);
+  }
+
+  void disconnect(const std::function<void()>& callback = nullptr) {
+    messenger_->disconnect(callback);
+  }
+
+  void async_receive(const std::function<void(std::string)>& callback) {
+    messenger_->async_receive(callback);
+  }
+
+  void async_send(const std::string& msg,
+                  const std::function<void(std::size_t)>& callback = nullptr) {
+    messenger_->async_send(msg, callback);
+  }
+
+  Software* get_messenger() { return messenger_.get(); }
+  std::string receive() { return messenger_->receive(); }
+  std::size_t send(const std::string& msg) { return messenger_->send(msg); }
+
+  void set_connection_handler(const std::function<void()>& callback) {
+    messenger_->set_connection_handler(callback);
+  }
+
+  void set_disconnection_handler(const std::function<void()>& callback) {
+    messenger_->set_disconnection_handler(callback);
+  }
+};
+} // namespace Hermes

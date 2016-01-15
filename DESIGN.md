@@ -1,7 +1,7 @@
 # Hermes design
 
-In this document, we will define each feature of Hermes. We will describe how to use it.
-Let's begin with an overview of Hermes core functionalities.
+In this document, we will define each feature of Hermes.
+We will describe how to use it. Let's begin with an overview of Hermes core functionalities.
 
 Hermes has three different parts:
 - Messenger:
@@ -115,7 +115,7 @@ One more thing, as you should know, using protobuf involves to having defined a 
 
   // set data to message.
 
-  // Asynchronous sending without providing callback.
+  // Asynchronous send without providing callback.
   protobuf::async_send<package::message>("127.0.0.1", "8080", message);
 
   // With callback given as lambda.
@@ -149,11 +149,12 @@ Inconming.
 ## Modules
 
   In the repository include/modules, you will find the following modules:
+
   - Hermes_protobuf.hpp
   - Hermes_messenger.hpp
   - Hermes_flatbuffers.hpp
 
-  A module works as Hermes. The modules are headers only so, you just have to
+ A module works as Hermes. The modules are headers only so, you just have to
   include the desired one to use it.
 
   ```c++
@@ -161,4 +162,5 @@ Inconming.
     #include "Hermes_protobuf.hpp"
   ```
 
-  Note: All modules are in namespace 'Hermes'.
+
+Note: All modules are in namespace 'Hermes'.

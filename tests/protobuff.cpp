@@ -66,10 +66,9 @@ void test_protobuf_asynchronous_operations() {
 
   std::thread thread_send([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    protobuf::async_send<com::Message>("127.0.0.1", "25555", message,
-                                       [&](std::size_t bytes) {
-       assert(bytes == 49);
-      });
+    protobuf::async_send<com::Message>(
+        "127.0.0.1", "25555", message,
+        [&](std::size_t bytes) { assert(bytes == 49); });
   });
 
   thread_send.join();
