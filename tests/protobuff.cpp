@@ -9,7 +9,7 @@
 using namespace Hermes;
 
 void test_protobuf_synchronous_operations() {
-  std::cout << "testing synchronous operations [protobuf]" << std::endl;
+  std::cout << "[Protobuf] testing synchronous operations." << std::endl;
   com::Message message;
 
   message.set_name("name");
@@ -25,7 +25,7 @@ void test_protobuf_synchronous_operations() {
       assert(test.from() == "from");
       assert(test.to() == "to");
       assert(test.msg() == "msg");
-      std::cout << "synchronous receive successfull." << "\n";
+      std::cout << "-> test synchronous operations [ok]." << std::endl;
   });
 
   std::thread thread_send([&](){
@@ -35,16 +35,14 @@ void test_protobuf_synchronous_operations() {
       std::this_thread::sleep_for(std::chrono::microseconds(200));
       auto size = protobuf::send<com::Message>("127.0.0.1", "8247", message);
       assert(size == serialized.size());
-      std::cout << "synchronous send successfull." << std::endl;
   });
 
   thread_send.join();
   thread_receive.join();
-  std::cout << "-> test synchronous operations [ok]." << std::endl;
 }
 
 void test_protobuf_asynchronous_operations() {
-  std::cout << "testing asynchronous operations [protobuf]" << std::endl;
+  std::cout << "[Protobuf] testing asynchronous operations." << std::endl;
   com::Message message;
   com::Message response;
 
@@ -61,18 +59,16 @@ void test_protobuf_asynchronous_operations() {
       assert(response.from() == "from: ok");
       assert(response.to() == "to: ok");
       assert(response.msg() == "msg: ok");
-      std::cout << "asynchronous receive callback executed successfully" << "\n";
+      std::cout << "-> test asynchronous operations [ok]." << std::endl;
     });
   });
 
   std::thread thread_send([&]() {
       protobuf::async_send<com::Message>("127.0.0.1", "8246", message, [](std::size_t bytes){
         assert(bytes == 49);
-        std::cout << "asynchronous send callback executed successfully" << "\n";
       });
     });
 
   thread_send.join();
   thread_receive.join();
-  std::cout << "-> test asynchronous operations [ok]." << std::endl;
 }

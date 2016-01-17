@@ -152,9 +152,8 @@ class Client : public Software {
       : async_(async),
         host_(host),
         port_(port),
-        strand_(io_service),
         connected_(false),
-        io_service_(io_service),
+        service_(io_service),
         stream_(Stream<typename T::socket>::create(io_service)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
@@ -171,9 +170,8 @@ class Client : public Software {
   bool async_;
   std::string host_;
   std::string port_;
-  asio::io_context::strand strand_;
   std::atomic<bool> connected_;
-  asio::io_context& io_service_;
+  asio::io_context::work service_;
   typename Stream<typename T::socket>::instance stream_;
 
  public:
@@ -205,7 +203,7 @@ class Client : public Software {
           else if (connect_handler_)
             connect_handler_();
         });
-    io_service_.run_one();
+    service_.get_io_service().run_one();
     return;
   }
 
@@ -282,9 +280,6 @@ class Client : public Software {
         asio::buffer(buffer, std::string(buffer).size()),
         [&](const asio::error_code& error, std::size_t bytes) {
 
-          std::cout << "dans le handler async_send"
-                    << "\n";
-
           if (error) {
             disconnect();
             throw asio::system_error(error);
@@ -298,7 +293,7 @@ class Client : public Software {
 
           if (callback) callback(bytes);
         });
-    io_service_.run_one();
+    service_.get_io_service().run_one();
   }
 
   void async_receive(const std::function<void(std::string)>& callback) {
@@ -332,7 +327,7 @@ class Client : public Software {
 
           callback(std::string(buffer));
         });
-    io_service_.run_one();
+    service_.get_io_service().run_one();
   }
 };
 
@@ -343,7 +338,7 @@ class Server : public Software {
       : async_(async),
         port_(port),
         connected_(false),
-        io_service_(io_service),
+        service_(io_service),
         stream_(Stream<typename T::socket>::create(io_service)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
@@ -360,7 +355,7 @@ class Server : public Software {
   bool async_;
   std::string port_;
   std::atomic<bool> connected_;
-  asio::io_context& io_service_;
+  asio::io_context::work service_;
   typename Stream<typename T::socket>::instance stream_;
 
  public:
@@ -524,7 +519,6 @@ class Messenger {
   Software* get_messenger() { return messenger_.get(); }
   std::string receive() { return messenger_->receive(); }
   std::size_t send(const std::string& msg) { return messenger_->send(msg); }
-  asio::io_context& service() { return io_service_; }
 };
 
 

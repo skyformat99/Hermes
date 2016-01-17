@@ -8,7 +8,7 @@
 using namespace Hermes;
 
 void test_session() {
-  std::cout << "testing session [Messenger]" << std::endl;
+  std::cout << "[Messenger] testing session." << std::endl;
   asio::io_context io_service;
   asio::ip::tcp::socket socket(io_service);
   Session<asio::ip::tcp::socket> session(socket);
@@ -51,7 +51,7 @@ void test_session() {
 }
 
 void test_stream() {
-  std::cout << "testing stream [Messenger]" << std::endl;
+  std::cout << "[Messenger] testing stream." << std::endl;
   asio::io_context io_service;
 
   auto stream = Stream<tcp::socket>::create(io_service);
@@ -103,7 +103,7 @@ void test_stream() {
 void test_tcp_protocol() {
 
   std::thread server([](){
-    std::cout << "testing tcp server [Messenger]" << std::endl;
+    std::cout << "[Messenger] testing tcp server." << std::endl;
     auto server = new Messenger("server", "tcp", true, "7777");
     assert(server);
     std::cout << "-> test tcp server [ok]." << std::endl;
@@ -111,12 +111,12 @@ void test_tcp_protocol() {
 
   std::thread client([](){
 
-    std::cout << "testing tcp client [Messenger]" << std::endl;
+    std::cout << "[Messenger] testing tcp client." << std::endl;
     auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
     assert(client);
 
     // client->run([](){
-    //   std::cout << "POURQUOI CE CALLBACK FONCTIONNE ???" << std::endl;
+    //   std::cout << "Connected :) " << std::endl;
     // });
     //
     // client->async_send("123456789\n", [](std::size_t bytes) {
@@ -127,11 +127,11 @@ void test_tcp_protocol() {
     //   std::cout << "response: " << response << std::endl;
     // });
     //
-    // std::this_thread::sleep_for(std::chrono::seconds(2));
     // client->disconnect([](){
-    //   std::cout << "ET POURQUOI CELUI LA AUSSI #?!!.#" << std::endl;
+    //   std::cout << "Deconnected :)" << std::endl;
     // });
     std::cout << "-> test tcp client [ok]." << std::endl;
+
   });
 
 
@@ -142,14 +142,14 @@ void test_tcp_protocol() {
 void test_udp_protocol() {
 
   std::thread server([](){
-    std::cout << "testing udp server [Messenger]" << std::endl;
+    std::cout << "[Messenger] testing udp server." << std::endl;
     auto server = new Messenger("server", "udp", true, "4444");
     assert(server);
     std::cout << "-> test udp server [ok]." << std::endl;
   });
 
   std::thread client([](){
-    std::cout << "testing udp client [Messenger]" << std::endl;
+    std::cout << "[Messenger] testing udp client." << std::endl;
     auto client = new Messenger("client", "udp", true, "4444", "127.0.0.1");
     assert(client);
     std::cout << "-> test udp client [ok]." << std::endl;
