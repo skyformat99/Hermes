@@ -1,10 +1,9 @@
 #include <thread>
 #include <iostream>
 #include <unistd.h>
-#include <assert.h>
 
-#include "Hermes.hpp"
 #include "Communication.pb.h"
+#include "Hermes.hpp"
 
 using namespace Hermes;
 
@@ -48,7 +47,6 @@ void test_session() {
   assert(session.get_heartbeat_message() == "test");
 
   session.stop();
-  assert(not socket.is_open());
   std::cout << "-> test session: [ok]." << std::endl;
 }
 
@@ -57,6 +55,13 @@ void test_stream() {
   asio::io_context io_service;
 
   auto stream = Stream<tcp::socket>::create(io_service);
+
+  assert(stream);
+  assert(not stream->socket().is_open());
+
+  stream->socket().open(asio::ip::tcp::v4());
+  assert(stream->socket().is_open());
+
   assert(stream->session().is_socket_unused());
   assert(not stream->session().is_ready_for_reading());
   assert(not stream->session().is_ready_for_writting());
@@ -64,7 +69,7 @@ void test_stream() {
   stream->session().set_state_to_socket(Hermes::READING);
   assert(not stream->session().is_socket_unused());
   assert(stream->session().is_ready_for_reading());
-  assert(stream->session().is_ready_for_writting());
+  assert(not stream->session().is_ready_for_writting());
 
   stream->session().set_state_to_socket(Hermes::WRITTING);
   assert(not stream->session().is_socket_unused());
@@ -90,31 +95,66 @@ void test_stream() {
   stream->session().set_heartbeat_message("test");
   assert(stream->session().get_heartbeat_message() == "test");
 
-  stream->session().stop();
+  stream->stop();
   assert(not stream->socket().is_open());
   std::cout << "-> test stream [ok]." << std::endl;
 }
 
 void test_tcp_protocol() {
-  std::cout << "testing tcp client [Messenger]" << std::endl;
-  auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
-  assert(client);
-  std::cout << "-> test tcp client [ok]." << std::endl;
 
-  std::cout << "testing tcp server [Messenger]" << std::endl;
-  auto server = new Messenger("server", "tcp", true, "6666");
-  assert(server);
-  std::cout << "-> test tcp server [ok]." << std::endl;
+  std::thread server([](){
+    std::cout << "testing tcp server [Messenger]" << std::endl;
+    auto server = new Messenger("server", "tcp", true, "7777");
+    assert(server);
+    std::cout << "-> test tcp server [ok]." << std::endl;
+  });
+
+  std::thread client([](){
+
+    std::cout << "testing tcp client [Messenger]" << std::endl;
+    auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
+    assert(client);
+
+    // client->run([](){
+    //   std::cout << "POURQUOI CE CALLBACK FONCTIONNE ???" << std::endl;
+    // });
+    //
+    // client->async_send("123456789\n", [](std::size_t bytes) {
+    //   std::cout << "sent: " << bytes << std::endl;
+    // });
+    //
+    // client->async_receive([](std::string response){
+    //   std::cout << "response: " << response << std::endl;
+    // });
+    //
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // client->disconnect([](){
+    //   std::cout << "ET POURQUOI CELUI LA AUSSI #?!!.#" << std::endl;
+    // });
+    std::cout << "-> test tcp client [ok]." << std::endl;
+  });
+
+
+  client.join();
+  server.join();
 }
 
 void test_udp_protocol() {
-  std::cout << "testing udp client [Messenger]" << std::endl;
-  auto client = new Messenger("client", "udp", true, "9999", "127.0.0.1");
-  assert(client);
-  std::cout << "-> test udp client [ok]." << std::endl;
 
-  std::cout << "testing udp server [Messenger]" << std::endl;
-  auto server = new Messenger("server", "udp", true, "9999");
-  assert(server);
-  std::cout << "-> test udp server [ok]." << std::endl;
+  std::thread server([](){
+    std::cout << "testing udp server [Messenger]" << std::endl;
+    auto server = new Messenger("server", "udp", true, "4444");
+    assert(server);
+    std::cout << "-> test udp server [ok]." << std::endl;
+  });
+
+  std::thread client([](){
+    std::cout << "testing udp client [Messenger]" << std::endl;
+    auto client = new Messenger("client", "udp", true, "4444", "127.0.0.1");
+    assert(client);
+    std::cout << "-> test udp client [ok]." << std::endl;
+  });
+
+  server.join();
+  client.join();
 }

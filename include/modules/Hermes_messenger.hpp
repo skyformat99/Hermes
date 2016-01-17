@@ -54,12 +54,11 @@ class Session {
   deadline_timer& heartbeat() { return heartbeat_; }
 
   void stop() {
+    deadline_.cancel();
+    heartbeat_.cancel();
     options_["state"] = false;
     options_["deadline"] = false;
     options_["heartbeat"] = false;
-    deadline_.cancel();
-    heartbeat_.cancel();
-    socket_.close();
   }
 
   void activate_option(const std::string& name) {
@@ -102,9 +101,9 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
   T& socket() { return socket_; }
   Session<T>& session() { return session_; }
 
-  void close() {
-    socket_.close();
+  void stop() {
     session_.stop();
+    socket_.close();
   }
 
  private:
@@ -141,7 +140,6 @@ class Software {
   std::function<void()> disconnect_handler_;
 };
 
-
 template <typename T>
 class Client : public Software {
  public:
@@ -150,6 +148,7 @@ class Client : public Software {
       : async_(async),
         host_(host),
         port_(port),
+        strand_(io_service),
         connected_(false),
         io_service_(io_service),
         stream_(Stream<typename T::socket>::create(io_service)) {
@@ -168,6 +167,7 @@ class Client : public Software {
   bool async_;
   std::string host_;
   std::string port_;
+  asio::io_context::strand strand_;
   std::atomic<bool> connected_;
   asio::io_context& io_service_;
   typename Stream<typename T::socket>::instance stream_;
@@ -178,9 +178,6 @@ class Client : public Software {
       throw std::logic_error(
           "[Messenger] Error: Client already connected to: " + host_ + ":" +
           port_);
-
-    char buffer[2048] = {0};
-    asio::error_code error = asio::error::host_not_found;
 
     asio::ip::basic_endpoint<T> endpoint(asio::ip::address::from_string(host_),
                                          std::stoi(port_));
@@ -194,11 +191,9 @@ class Client : public Software {
     stream_->socket().async_connect(
         endpoint, [this, &callback](const asio::error_code& error) {
 
-          if (error) {
-            stream_->close();
+          if (error)
             throw std::runtime_error(" [Messenger] Connection to host: " +
                                      host_ + " port: " + port_ + " failed.");
-          }
 
           connected_ = true;
           if (callback)
@@ -206,21 +201,18 @@ class Client : public Software {
           else if (connect_handler_)
             connect_handler_();
         });
-
-    io_service_.run();
+    io_service_.run_one();
     return;
   }
 
   void disconnect(const std::function<void()>& callback = nullptr) {
     if (connected_) {
+      stream_->stop();
       connected_ = false;
-
       if (callback)
         callback();
       else if (disconnect_handler_)
         disconnect_handler_();
-      else
-        stream_->close();
     }
   }
 
@@ -237,7 +229,7 @@ class Client : public Software {
     stream_->socket().send(asio::buffer(buffer, message.size()), 0, error);
 
     if (error) {
-      stream_->close();
+      disconnect();
       throw std::runtime_error(
           "[Messenger] Sending message through socket bind on: " + host_ + ":" +
           port_ + " failed.");
@@ -252,19 +244,18 @@ class Client : public Software {
           "[Messenger] Client is not connected. Call 'run' method once "
           "before.");
 
-    std::string response;
     asio::error_code error;
     char buffer[2048] = {0};
 
     auto bytes =
         stream_->socket().receive(asio::buffer(buffer, 2048), 0, error);
 
-    if (response = buffer, error or bytes != response.size()) {
-      stream_->close();
+    if (error or not bytes) {
+      disconnect();
       throw std::runtime_error("[Messenger] Receiving data from: " + host_ +
                                ":" + port_ + " failed.");
     }
-    return response;
+    return std::string(buffer);
   }
 
   void async_send(const std::string& message,
@@ -280,27 +271,30 @@ class Client : public Software {
       return;
     }
 
-    asio::error_code error;
     char buffer[2048] = {0};
 
     std::strcpy(buffer, message.c_str());
-    stream_->socket().async_send(asio::buffer(buffer, message.size()),
-                                 [&](const asio::error_code& error,
-                                     std::size_t bytes) {
+    stream_->socket().async_send(
+        asio::buffer(buffer, std::string(buffer).size()),
+        [&](const asio::error_code& error, std::size_t bytes) {
 
-      if (error) {
-        stream_->close();
-        throw asio::system_error(error);
-      }
+          std::cout << "dans le handler async_send"
+                    << "\n";
 
-      if (not bytes or bytes != message.size()) {
-        stream_->close();
-        throw std::runtime_error(
-            "[Messenger] async_send failed. Unexpected error 0 bytes sent.");
-      }
+          if (error) {
+            disconnect();
+            throw asio::system_error(error);
+          }
 
-      if (callback) callback(bytes);
-    });
+          if (not bytes or bytes != std::string(buffer).size()) {
+            disconnect();
+            throw std::runtime_error(
+                "[Messenger] async_send failed. Unexpected error occurred.");
+          }
+
+          if (callback) callback(bytes);
+        });
+    io_service_.run_one();
   }
 
   void async_receive(const std::function<void(std::string)>& callback) {
@@ -317,23 +311,24 @@ class Client : public Software {
 
     asio::error_code error;
     char buffer[2048] = {0};
-
     stream_->socket().async_receive(
         asio::buffer(buffer, 2048),
         [&](const asio::error_code& error, std::size_t bytes) {
+
           if (error and error != asio::error::eof) {
-            stream_->close();
+            disconnect();
             throw asio::system_error(error);
           }
 
           if (not bytes or std::string(buffer).empty()) {
-            stream_->close();
+            disconnect();
             throw std::runtime_error(
                 "[Messenger] Unexpected error occurred. async_receive failed.");
           }
 
           callback(std::string(buffer));
         });
+    io_service_.run_one();
   }
 };
 
@@ -468,23 +463,21 @@ class Messenger {
 
     switch (flag) {
       case TCP_CLIENT:
-        messenger_ = std::make_shared<Client<asio::ip::tcp>>(io_service_, host,
-                                                             port, async_);
+        messenger_ =
+            std::make_shared<Client<tcp>>(io_service_, host, port, async_);
         break;
 
       case UDP_CLIENT:
-        messenger_ = std::make_shared<Client<asio::ip::udp>>(io_service_, host,
-                                                             port, async_);
+        messenger_ =
+            std::make_shared<Client<udp>>(io_service_, host, port, async_);
         break;
 
       case TCP_SERVER:
-        messenger_ =
-            std::make_shared<Server<asio::ip::tcp>>(io_service_, port, async_);
+        messenger_ = std::make_shared<Server<tcp>>(io_service_, port, async_);
         break;
 
       case UDP_SERVER:
-        messenger_ =
-            std::make_shared<Server<asio::ip::udp>>(io_service_, port, async_);
+        messenger_ = std::make_shared<Server<udp>>(io_service_, port, async_);
         break;
 
       default:
@@ -516,10 +509,6 @@ class Messenger {
     messenger_->async_send(msg, callback);
   }
 
-  Software* get_messenger() { return messenger_.get(); }
-  std::string receive() { return messenger_->receive(); }
-  std::size_t send(const std::string& msg) { return messenger_->send(msg); }
-
   void set_connection_handler(const std::function<void()>& callback) {
     messenger_->set_connection_handler(callback);
   }
@@ -527,5 +516,11 @@ class Messenger {
   void set_disconnection_handler(const std::function<void()>& callback) {
     messenger_->set_disconnection_handler(callback);
   }
+
+  Software* get_messenger() { return messenger_.get(); }
+  std::string receive() { return messenger_->receive(); }
+  std::size_t send(const std::string& msg) { return messenger_->send(msg); }
+  asio::io_context& service() { return io_service_; }
 };
+
 } // namespace Hermes

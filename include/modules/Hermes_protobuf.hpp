@@ -6,9 +6,10 @@
 #include <functional>
 
 #include <assert.h>
+#undef NDEBUG
 
-#include "google/protobuf/message.h"
 #include "asio.hpp"
+#include "google/protobuf/message.h"
 
 namespace Hermes {
 
@@ -30,11 +31,16 @@ using namespace asio::ip;
 * @threadsafe:
 *  All asio's network variables belong to their scope function so, many threads
 *  could do multiple calls in the same time to Hermes protobuf operations. No
-*  unknown
-*  behavior will happen.
+*  unknown behavior will happen.
 *
 * @protocol:
 *   TCP
+*
+* @see:
+*   design:
+        https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*   exemples:
+*       https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp
 */
 namespace protobuf {
 
@@ -44,7 +50,7 @@ using namespace google::protobuf;
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  const T& message) {
-  assert(message.GetDescriptor());
+  assert(message.GetDescriptor() and std::stoi(port) >= 0);
 
   std::string serialized;
   char buffer[2048] = {0};
@@ -77,15 +83,14 @@ std::size_t send(const std::string& host, const std::string& port,
 // Synchronous reading operation.
 template <typename T>
 T receive(const std::string& port) {
-  assert(std::stoi(port));
+  assert(std::stoi(port) >= 0);
   asio::error_code error;
   char buffer[2048] = {0};
   asio::io_context io_service;
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
-  tcp::acceptor::reuse_address option(true);
-  acceptor.set_option(option);
+  acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
   acceptor.accept(socket, error);
 
   if (error) {
@@ -111,12 +116,11 @@ T receive(const std::string& port) {
   return result;
 }
 
-// Asynchronous writting operation.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 const T& message,
                 const std::function<void(std::size_t)>& callback = nullptr) {
-  assert(message.GetDescriptor());
+  assert(message.GetDescriptor() and std::stoi(port) >= 0);
 
   char buffer[2048] = {0};
   std::string serialized;
@@ -152,27 +156,33 @@ void async_send(const std::string& host, const std::string& port,
     });
 
   });
+  io_service.run();
 }
 
 // Asynchronous reading operation.
 template <typename T>
 void async_receive(const std::string& port,
                    const std::function<void(T)>& callback) {
-  assert(callback);
+  assert(std::stoi(port) >= 0);
+  asio::error_code error;
   char buffer[2048] = {0};
   asio::io_context io_service;
 
   tcp::socket socket(io_service);
-  tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
-  tcp::acceptor::reuse_address option(true);
-  acceptor.set_option(option);
+  tcp::acceptor acceptor(io_service);
+  tcp::endpoint endpoint(tcp::v4(), std::stoi(port));
+
+  acceptor.open(endpoint.protocol());
+  acceptor.set_option(tcp::acceptor::reuse_address(true));
+  acceptor.bind(endpoint);
+  acceptor.listen();
   acceptor.async_accept(socket, [&](const asio::error_code& error) {
 
     if (error) {
       acceptor.close();
       socket.close();
-      throw std::runtime_error("[protobuf] Accepting connection on port: " +
-                               port + " failed.");
+      throw std::runtime_error("[protobuf] Accept connection on port: " + port +
+                               " failed.");
     }
 
     asio::async_read(socket, asio::buffer(buffer, 2048),
@@ -192,8 +202,8 @@ void async_receive(const std::string& port,
       response.ParseFromString(std::string(buffer));
       callback(response);
     });
-
   });
+  io_service.run();
 }
 
 }  // namespace protobuf

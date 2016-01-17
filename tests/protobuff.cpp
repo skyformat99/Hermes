@@ -8,24 +8,6 @@
 
 using namespace Hermes;
 
-void send_routine(const com::Message& message) {
-  std::string serialized;
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  message.SerializeToString(&serialized);
-  auto size = protobuf::send<com::Message>("127.0.0.1", "8246", message);
-  assert(size == serialized.size());
-}
-
-void receive_routine() {
-  auto test = protobuf::receive<com::Message>("8246");
-  assert(test.name() == "name");
-  assert(test.object() == "object");
-  assert(test.from() == "from");
-  assert(test.to() == "to");
-  assert(test.msg() == "msg");
-}
-
 void test_protobuf_synchronous_operations() {
   std::cout << "testing synchronous operations [protobuf]" << std::endl;
   com::Message message;
@@ -36,8 +18,26 @@ void test_protobuf_synchronous_operations() {
   message.set_to("to");
   message.set_msg("msg");
 
-  std::thread thread_receive(receive_routine);
-  std::thread thread_send(send_routine, message);
+  std::thread thread_receive([](){
+      auto test = protobuf::receive<com::Message>("8247");
+      assert(test.name() == "name");
+      assert(test.object() == "object");
+      assert(test.from() == "from");
+      assert(test.to() == "to");
+      assert(test.msg() == "msg");
+      std::cout << "synchronous receive successfull." << "\n";
+  });
+
+  std::thread thread_send([&](){
+      std::string serialized;
+
+      message.SerializeToString(&serialized);
+      std::this_thread::sleep_for(std::chrono::microseconds(200));
+      auto size = protobuf::send<com::Message>("127.0.0.1", "8247", message);
+      assert(size == serialized.size());
+      std::cout << "synchronous send successfull." << std::endl;
+  });
+
   thread_send.join();
   thread_receive.join();
   std::cout << "-> test synchronous operations [ok]." << std::endl;
@@ -55,21 +55,22 @@ void test_protobuf_asynchronous_operations() {
   message.set_msg("msg: ok");
 
   std::thread thread_receive([&]() {
-    protobuf::async_receive<com::Message>("25555", [&](com::Message response) {
+    protobuf::async_receive<com::Message>("8246", [](com::Message response) {
       assert(response.name() == "name: ok");
       assert(response.object() == "object: ok");
       assert(response.from() == "from: ok");
       assert(response.to() == "to: ok");
       assert(response.msg() == "msg: ok");
+      std::cout << "asynchronous receive callback executed successfully" << "\n";
     });
   });
 
   std::thread thread_send([&]() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    protobuf::async_send<com::Message>(
-        "127.0.0.1", "25555", message,
-        [&](std::size_t bytes) { assert(bytes == 49); });
-  });
+      protobuf::async_send<com::Message>("127.0.0.1", "8246", message, [](std::size_t bytes){
+        assert(bytes == 49);
+        std::cout << "asynchronous send callback executed successfully" << "\n";
+      });
+    });
 
   thread_send.join();
   thread_receive.join();

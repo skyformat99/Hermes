@@ -13,7 +13,7 @@ int main()
 
 
   // Module - Serialization
-  //Testing Hermes protobuf operations
+  // Testing Hermes protobuf operations
   test_protobuf_synchronous_operations();
   test_protobuf_asynchronous_operations();
   return 0;
