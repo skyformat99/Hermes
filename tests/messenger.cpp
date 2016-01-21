@@ -104,34 +104,39 @@ void test_tcp_protocol() {
 
   std::thread server([](){
     std::cout << "[Messenger] testing tcp server." << std::endl;
-    auto server = new Messenger("server", "tcp", true, "7777");
+    auto server = new Messenger("server", "tcp", true, "6666");
     assert(server);
-    std::cout << "-> test tcp server [ok]." << std::endl;
+
+    server->set_connection_handler([&](){
+
+      std::cout << server->receive();
+      std::cout << "-> test tcp server [ok]." << std::endl;
+      server->disconnect();
+    });
+
+    server->run();
   });
 
   std::thread client([](){
 
     std::cout << "[Messenger] testing tcp client." << std::endl;
-    auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
-    assert(client);
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+      auto client = new Messenger("client", "tcp", true, "6666", "127.0.0.1");
+      assert(client);
 
-    // client->run([](){
-    //   std::cout << "Connected :) " << std::endl;
-    // });
-    //
-    // client->async_send("123456789\n", [](std::size_t bytes) {
-    //   std::cout << "sent: " << bytes << std::endl;
-    // });
-    //
-    // client->async_receive([](std::string response){
-    //   std::cout << "response: " << response << std::endl;
-    // });
-    //
-    // client->disconnect([](){
-    //   std::cout << "Deconnected :)" << std::endl;
-    // });
-    std::cout << "-> test tcp client [ok]." << std::endl;
+      auto c = []() { std::cout << "connected :)" << "\n"; };
+      auto d = []() { std::cout << "connection closed." << "\n"; };
 
+      client->set_connection_handler(c);
+      client->set_disconnection_handler(d);
+      client->run();
+
+      client->async_send("123456789\n", [](std::size_t bytes) {
+        std::cout << "sent: " << bytes << std::endl;
+        std::cout << "-> test tcp client [ok]." << std::endl;
+      });
+
+      client->disconnect();
   });
 
 

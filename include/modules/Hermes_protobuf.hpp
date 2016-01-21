@@ -8,8 +8,10 @@
 #include <assert.h>
 #undef NDEBUG
 
-#include "asio.hpp"
 #include "google/protobuf/message.h"
+#include "asio.hpp"
+
+#define BUFFER_SIZE 2048
 
 namespace Hermes {
 
@@ -53,7 +55,7 @@ std::size_t send(const std::string& host, const std::string& port,
   assert(message.GetDescriptor() and std::stoi(port) >= 0);
 
   std::string serialized;
-  char buffer[2048] = {0};
+  char buffer[BUFFER_SIZE] = {0};
   asio::io_context io_service;
   asio::error_code error = asio::error::host_not_found;
 
@@ -85,7 +87,7 @@ template <typename T>
 T receive(const std::string& port) {
   assert(std::stoi(port) >= 0);
   asio::error_code error;
-  char buffer[2048] = {0};
+  char buffer[BUFFER_SIZE] = {0};
   asio::io_context io_service;
 
   tcp::socket socket(io_service);
@@ -122,7 +124,7 @@ void async_send(const std::string& host, const std::string& port,
                 const std::function<void(std::size_t)>& callback = nullptr) {
   assert(message.GetDescriptor() and std::stoi(port) >= 0);
 
-  char buffer[2048] = {0};
+  char buffer[BUFFER_SIZE] = {0};
   std::string serialized;
   asio::io_context io_service;
 
@@ -165,7 +167,7 @@ void async_receive(const std::string& port,
                    const std::function<void(T)>& callback) {
   assert(std::stoi(port) >= 0);
   asio::error_code error;
-  char buffer[2048] = {0};
+  char buffer[BUFFER_SIZE] = {0};
   asio::io_context io_service;
 
   tcp::socket socket(io_service);
@@ -185,7 +187,7 @@ void async_receive(const std::string& port,
                                " failed.");
     }
 
-    asio::async_read(socket, asio::buffer(buffer, 2048),
+    asio::async_read(socket, asio::buffer(buffer, BUFFER_SIZE),
                      [&](const asio::error_code& error, std::size_t bytes) {
 
       if (error and error != asio::error::eof) {
