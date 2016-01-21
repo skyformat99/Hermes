@@ -47,12 +47,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-variable -lpthread -g")
 include_directories(pb)
 include_directories(tests)
 include_directories(include)
+include_directories(libs/Catch/single_include)
 include_directories(libs/asio/asio)
 include_directories(libs/asio/asio/include)
 
 
 add_executable(test_hermes pb/Communication.pb.cc
-                           src/main.cpp)
+                           tests/main.cpp)
 
 target_link_libraries(test_hermes ${Boost_FILESYSTEM_LIBRARY}
                                    ${Boost_SYSTEM_LIBRARY}
