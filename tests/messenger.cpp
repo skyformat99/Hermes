@@ -131,8 +131,8 @@ void test_tcp_protocol() {
       client->set_disconnection_handler(d);
       client->run();
 
-      client->async_send("123456789\n", [](std::size_t bytes) {
-        std::cout << "sent: " << bytes << std::endl;
+      client->async_send("test :)\n", [](std::size_t bytes) {
+        std::cout << "bytes sent: " << bytes << std::endl;
         std::cout << "-> test tcp client [ok]." << std::endl;
       });
 

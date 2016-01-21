@@ -161,7 +161,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
                        [&](const asio::error_code error, std::size_t bytes) {
       if (error) throw asio::system_error(error);
 
-      if (not bytes or bytes != std::string(buffer).size()) {
+      if (not bytes) {
         throw std::runtime_error(
             "[Messenger] async_send failed. Unexpected error occurred.");
       }
@@ -180,7 +180,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
         asio::buffer(buffer, BUFFER_SIZE),
         [&](const asio::error_code& error, std::size_t bytes) {
 
-          if (error and error != asio::error::eof)
+          if (error)
             throw asio::system_error(error);
 
           if (not bytes or std::string(buffer).empty()) {
