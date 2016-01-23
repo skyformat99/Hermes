@@ -11,13 +11,13 @@ SCENARIO("Module Messenger: session", "[session]") {
     Hermes::Session<asio::ip::tcp::socket> session(socket);
 
     WHEN("default") {
-      REQUIRE_NOTHROW(session.is_socket_unused());
-      REQUIRE_NOTHROW(not session.is_ready_for_writting());
-      REQUIRE_NOTHROW(not session.is_ready_for_reading());
-      REQUIRE_NOTHROW(not session.is_option_activated("state"));
-      REQUIRE_NOTHROW(not session.is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not session.is_option_activated("heartbeat"));
-      REQUIRE_NOTHROW(session.get_heartbeat_message() == "<3");
+      REQUIRE(session.is_socket_unused() == true);
+      REQUIRE(not session.is_ready_for_writting());
+      REQUIRE(not session.is_ready_for_reading());
+      REQUIRE(not session.is_option_activated("state"));
+      REQUIRE(not session.is_option_activated("deadline"));
+      REQUIRE(not session.is_option_activated("heartbeat"));
+      REQUIRE(session.get_heartbeat_message() == "<3");
     }
   }
 
@@ -27,43 +27,22 @@ SCENARIO("Module Messenger: session", "[session]") {
     Hermes::Session<asio::ip::tcp::socket> session(socket);
 
     WHEN("settting state READING to socket") {
-      REQUIRE_NOTHROW(session.set_state_to_socket(Hermes::READING));
-      REQUIRE_NOTHROW(not session.is_socket_unused());
-      REQUIRE_NOTHROW(not session.is_ready_for_writting());
-      REQUIRE_NOTHROW(session.is_ready_for_reading());
+      session.set_state_to_socket(Hermes::READING);
+      REQUIRE(not session.is_socket_unused());
+      REQUIRE(not session.is_ready_for_writting());
+      REQUIRE(session.is_ready_for_reading());
     }
 
     WHEN("setting state WRITTING to socket") {
-      REQUIRE_NOTHROW(session.set_state_to_socket(Hermes::WRITTING));
-      REQUIRE_NOTHROW(not session.is_socket_unused());
-      REQUIRE_NOTHROW(session.is_ready_for_writting());
-      REQUIRE_NOTHROW(not session.is_ready_for_reading());
-    }
-
-    WHEN("activating options 'state'") {
-      REQUIRE_NOTHROW(session.activate_option("state"));
-      REQUIRE_NOTHROW(session.is_option_activated("state"));
-      REQUIRE_NOTHROW(not session.is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not session.is_option_activated("heartbeat"));
-    }
-
-    WHEN("activating options 'deadline'") {
-      REQUIRE_NOTHROW(session.activate_option("deadline"));
-      REQUIRE_NOTHROW(session.is_option_activated("state"));
-      REQUIRE_NOTHROW(session.is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not session.is_option_activated("heartbeat"));
-    }
-
-    WHEN("activating heartbeat option") {
-      REQUIRE_NOTHROW(session.activate_option("heartbeat"));
-      REQUIRE_NOTHROW(session.is_option_activated("state"));
-      REQUIRE_NOTHROW(session.is_option_activated("deadline"));
-      REQUIRE_NOTHROW(session.is_option_activated("heartbeat"));
+      session.set_state_to_socket(Hermes::WRITTING);
+      REQUIRE(not session.is_socket_unused());
+      REQUIRE(session.is_ready_for_writting());
+      REQUIRE(not session.is_ready_for_reading());
     }
 
     WHEN("setting new heartbeat message") {
-      REQUIRE_NOTHROW(session.set_heartbeat_message("test"));
-      REQUIRE_NOTHROW(session.get_heartbeat_message() == "test");
+      session.set_heartbeat_message("test");
+      REQUIRE(session.get_heartbeat_message() == "test");
     }
   }
 }
@@ -75,15 +54,15 @@ SCENARIO("Module Messenger: stream", "[stream]") {
     auto stream = Hermes::Stream<asio::ip::tcp::socket>::create(io_service);
 
     WHEN("default") {
-      REQUIRE_NOTHROW(stream);
-      REQUIRE_NOTHROW(not stream->socket().is_open());
-      REQUIRE_NOTHROW(stream->session().is_socket_unused());
-      REQUIRE_NOTHROW(not stream->session().is_ready_for_writting());
-      REQUIRE_NOTHROW(not stream->session().is_ready_for_reading());
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("state"));
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("heartbeat"));
-      REQUIRE_NOTHROW(stream->session().get_heartbeat_message() == "<3");
+      REQUIRE(stream);
+      REQUIRE(not stream->socket().is_open());
+      REQUIRE(stream->session().is_socket_unused());
+      REQUIRE(not stream->session().is_ready_for_writting());
+      REQUIRE(not stream->session().is_ready_for_reading());
+      REQUIRE(not stream->session().is_option_activated("state"));
+      REQUIRE(not stream->session().is_option_activated("deadline"));
+      REQUIRE(not stream->session().is_option_activated("heartbeat"));
+      REQUIRE(stream->session().get_heartbeat_message() == "<3");
     }
   }
 
@@ -93,72 +72,29 @@ SCENARIO("Module Messenger: stream", "[stream]") {
     auto stream = Hermes::Stream<asio::ip::tcp::socket>::create(io_service);
 
     WHEN("settting state READING to socket") {
-      REQUIRE_NOTHROW(stream->session().set_state_to_socket(Hermes::READING));
-      REQUIRE_NOTHROW(not stream->session().is_socket_unused());
-      REQUIRE_NOTHROW(not stream->session().is_ready_for_writting());
-      REQUIRE_NOTHROW(stream->session().is_ready_for_reading());
+      stream->session().set_state_to_socket(Hermes::READING);
+      REQUIRE(not stream->session().is_socket_unused());
+      REQUIRE(not stream->session().is_ready_for_writting());
+      REQUIRE(stream->session().is_ready_for_reading());
     }
 
     WHEN("setting state WRITTING to socket") {
-      REQUIRE_NOTHROW(stream->session().set_state_to_socket(Hermes::WRITTING));
-      REQUIRE_NOTHROW(not stream->session().is_socket_unused());
-      REQUIRE_NOTHROW(stream->session().is_ready_for_writting());
-      REQUIRE_NOTHROW(not stream->session().is_ready_for_reading());
-    }
-
-    WHEN("activating options 'state'") {
-      REQUIRE_NOTHROW(stream->session().activate_option("state"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("state"));
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("heartbeat"));
-    }
-
-    WHEN("activating options 'deadline'") {
-      REQUIRE_NOTHROW(stream->session().activate_option("deadline"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("state"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("deadline"));
-      REQUIRE_NOTHROW(not stream->session().is_option_activated("heartbeat"));
-    }
-
-    WHEN("activating heartbeat option") {
-      REQUIRE_NOTHROW(stream->session().activate_option("heartbeat"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("state"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("deadline"));
-      REQUIRE_NOTHROW(stream->session().is_option_activated("heartbeat"));
+      stream->session().set_state_to_socket(Hermes::WRITTING);
+      REQUIRE(not stream->session().is_socket_unused());
+      REQUIRE(stream->session().is_ready_for_writting());
+      REQUIRE(not stream->session().is_ready_for_reading());
     }
 
     WHEN("setting new heartbeat message") {
-      REQUIRE_NOTHROW(stream->session().set_heartbeat_message("test"));
+      stream->session().set_heartbeat_message("test");
       REQUIRE_NOTHROW(stream->session().get_heartbeat_message() == "test");
     }
 
     WHEN("opening socket") {
-      REQUIRE_NOTHROW(stream->socket().open(asio::ip::tcp::v4()));
-      REQUIRE_NOTHROW(stream->socket().is_open());
+      stream->socket().open(asio::ip::tcp::v4());
+      REQUIRE(stream->socket().is_open());
       REQUIRE_NOTHROW(stream->stop());
-      REQUIRE_NOTHROW(not stream->socket().is_open());
-    }
-  }
-}
-
-SCENARIO("Module Messenger: TCP", "[software]") {
-  GIVEN("Synchronous client connection to a server which is not listenning") {
-    auto client = new Hermes::Messenger("client", "tcp", false, "2222");
-
-    WHEN("you try to connect") { REQUIRE_THROWS(client->run()); }
-  }
-
-  GIVEN("Synchronous client connection to available server") {
-    auto client = new Hermes::Messenger("client", "tcp", false, "2222");
-    auto server = new Hermes::Messenger("server", "tcp", true, "2222");
-
-    server->set_connection_handler([&]() { server->disconnect(); });
-    WHEN("you try to connect") {
-      REQUIRE_NOTHROW(client);
-      REQUIRE_NOTHROW(server);
-      REQUIRE_NOTHROW(client->run());
-      REQUIRE_NOTHROW(client->disconnect());
-      REQUIRE_NOTHROW(server->run());
+      REQUIRE(not stream->socket().is_open());
     }
   }
 }
@@ -176,11 +112,11 @@ SCENARIO("Module serialization", "[protobuf]") {
     WHEN("not async") {
       std::thread thread_receive([]() {
         auto test = Hermes::protobuf::receive<com::Message>("8247");
-        REQUIRE_NOTHROW(test.name() == "name");
-        REQUIRE_NOTHROW(test.object() == "object");
-        REQUIRE_NOTHROW(test.from() == "from");
-        REQUIRE_NOTHROW(test.to() == "to");
-        REQUIRE_NOTHROW(test.msg() == "msg");
+        REQUIRE(test.name() == "name");
+        REQUIRE(test.object() == "object");
+        REQUIRE(test.from() == "from");
+        REQUIRE(test.to() == "to");
+        REQUIRE(test.msg() == "msg");
       });
 
       std::thread thread_send([&]() {
@@ -190,7 +126,7 @@ SCENARIO("Module serialization", "[protobuf]") {
         std::this_thread::sleep_for(std::chrono::microseconds(200));
         auto size =
             Hermes::protobuf::send<com::Message>("127.0.0.1", "8247", message);
-        REQUIRE_NOTHROW(size == serialized.size());
+        REQUIRE(size == serialized.size());
       });
 
       thread_send.join();
@@ -211,11 +147,11 @@ SCENARIO("Module serialization", "[protobuf]") {
       std::thread thread_receive([&]() {
         Hermes::protobuf::async_receive<com::Message>(
             "8246", [](com::Message response) {
-              REQUIRE_NOTHROW(response.name() == "name: ok");
-              REQUIRE_NOTHROW(response.object() == "object: ok");
-              REQUIRE_NOTHROW(response.from() == "from: ok");
-              REQUIRE_NOTHROW(response.to() == "to: ok");
-              REQUIRE_NOTHROW(response.msg() == "msg: ok");
+              REQUIRE(response.name() == "name: ok");
+              REQUIRE(response.object() == "object: ok");
+              REQUIRE(response.from() == "from: ok");
+              REQUIRE(response.to() == "to: ok");
+              REQUIRE(response.msg() == "msg: ok");
             });
       });
 
@@ -223,7 +159,7 @@ SCENARIO("Module serialization", "[protobuf]") {
         std::this_thread::sleep_for(std::chrono::microseconds(200));
         Hermes::protobuf::async_send<com::Message>(
             "127.0.0.1", "8246", message,
-            [](std::size_t bytes) { REQUIRE_NOTHROW(bytes == 49); });
+            [](std::size_t bytes) { REQUIRE(bytes == 49); });
       });
 
       thread_send.join();
