@@ -163,10 +163,10 @@ void async_send(const std::string& host, const std::string& port,
       }
 
       if (not bytes) {
-          socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-          socket.close();
-          throw std::runtime_error(
-              "[protobuf] Unexpected error occurred: 0 bytes sent");
+        socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+        socket.close();
+        throw std::runtime_error(
+            "[protobuf] Unexpected error occurred: 0 bytes sent");
       }
 
       if (callback) callback(bytes);
@@ -175,7 +175,7 @@ void async_send(const std::string& host, const std::string& port,
     });
 
   });
-  std::thread([&](){ io_service.run(); }).join();
+  std::thread([&]() { io_service.run(); }).join();
 }
 
 // Asynchronous reading operation.
@@ -231,7 +231,7 @@ void async_receive(const std::string& port,
       socket.close();
     });
   });
-  std::thread([&](){ io_service.run(); }).join();
+  std::thread([&]() { io_service.run(); }).join();
 }
 
 }  // namespace protobuf

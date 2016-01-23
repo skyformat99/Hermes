@@ -183,8 +183,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
         asio::buffer(buffer, BUFFER_SIZE),
         [&](const asio::error_code& error, std::size_t bytes) {
 
-          if (error)
-            throw asio::system_error(error);
+          if (error) throw asio::system_error(error);
 
           if (not bytes or std::string(buffer).empty()) {
             throw std::runtime_error(
@@ -406,7 +405,6 @@ class TCP_Server : public Software {
   TCP_Server& operator=(TCP_Server&&) = delete;
   TCP_Server& operator=(const TCP_Server&) = delete;
 
-
   ~TCP_Server() noexcept { disconnect(); }
 
  private:
@@ -420,7 +418,7 @@ class TCP_Server : public Software {
  public:
   void run() {
     if (not async_) {
-      return ;
+      return;
     }
 
     std::vector<std::shared_ptr<std::thread>> threads;
@@ -475,7 +473,7 @@ class TCP_Server : public Software {
 
     try {
       stream_->async_send(message, false, callback);
-    } catch(const std::exception& e) {
+    } catch (const std::exception& e) {
       disconnect();
       std::cerr << e.what() << std::endl;
     }
@@ -512,7 +510,6 @@ class TCP_Server : public Software {
         [&](const asio::error_code& error) { handle_accept(error); });
   }
 };
-
 
 /**
 * Messenger class allows you to create network software.

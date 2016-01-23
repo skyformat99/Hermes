@@ -184,8 +184,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
         asio::buffer(buffer, BUFFER_SIZE),
         [&](const asio::error_code& error, std::size_t bytes) {
 
-          if (error)
-            throw asio::system_error(error);
+          if (error) throw asio::system_error(error);
 
           if (not bytes or std::string(buffer).empty()) {
             throw std::runtime_error(
@@ -407,7 +406,6 @@ class TCP_Server : public Software {
   TCP_Server& operator=(TCP_Server&&) = delete;
   TCP_Server& operator=(const TCP_Server&) = delete;
 
-
   ~TCP_Server() noexcept { disconnect(); }
 
  private:
@@ -421,7 +419,7 @@ class TCP_Server : public Software {
  public:
   void run() {
     if (not async_) {
-      return ;
+      return;
     }
 
     std::vector<std::shared_ptr<std::thread>> threads;
@@ -476,7 +474,7 @@ class TCP_Server : public Software {
 
     try {
       stream_->async_send(message, false, callback);
-    } catch(const std::exception& e) {
+    } catch (const std::exception& e) {
       disconnect();
       std::cerr << e.what() << std::endl;
     }
@@ -513,7 +511,6 @@ class TCP_Server : public Software {
         [&](const asio::error_code& error) { handle_accept(error); });
   }
 };
-
 
 /**
 * Messenger class allows you to create network software.
@@ -718,7 +715,7 @@ std::size_t send(const std::string& host, const std::string& port,
   asio::connect(socket, endpoint, error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+    socket.shutdown(tcp::socket::shutdown_both);
     socket.close();
     throw std::runtime_error("[protobuf] Connection to host: " + host +
                              " port: " + port + " failed.");
@@ -727,12 +724,12 @@ std::size_t send(const std::string& host, const std::string& port,
   asio::write(socket, asio::buffer(buffer, serialized.size()), error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+    socket.shutdown(tcp::socket::shutdown_both);
     socket.close();
     throw asio::system_error(error);
   }
 
-  socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+  socket.shutdown(tcp::socket::shutdown_both);
   socket.close();
   return serialized.size();
 }
@@ -747,11 +744,11 @@ T receive(const std::string& port) {
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
-  acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+  acceptor.set_option(tcp::acceptor::reuse_address(true));
   acceptor.accept(socket, error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+    socket.shutdown(tcp::socket::shutdown_both);
     socket.close();
     acceptor.close();
     throw std::runtime_error("[protobuf] Accepting connection on port: " +
@@ -764,7 +761,7 @@ T receive(const std::string& port) {
     acceptor.close();
     throw std::runtime_error("[protobuf] connection closed.");
   } else if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+    socket.shutdown(tcp::socket::shutdown_both);
     socket.close();
     acceptor.close();
     throw asio::system_error(error);
@@ -772,7 +769,7 @@ T receive(const std::string& port) {
 
   T result;
   result.ParseFromString(std::string(buffer));
-  socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+  socket.shutdown(tcp::socket::shutdown_both);
   socket.close();
   acceptor.close();
   return result;
@@ -796,7 +793,7 @@ void async_send(const std::string& host, const std::string& port,
                        [&](const asio::error_code& error) {
 
     if (error) {
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+      socket.shutdown(tcp::socket::shutdown_both);
       socket.close();
       throw std::runtime_error("[protobuf] Connection to host: " + host +
                                " port: " + port + " failed.");
@@ -807,25 +804,25 @@ void async_send(const std::string& host, const std::string& port,
                       [&](const asio::error_code& error, std::size_t bytes) {
 
       if (error) {
-        socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+        socket.shutdown(tcp::socket::shutdown_both);
         socket.close();
         throw std::system_error(error);
       }
 
       if (not bytes) {
-          socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-          socket.close();
-          throw std::runtime_error(
-              "[protobuf] Unexpected error occurred: 0 bytes sent");
+        socket.shutdown(tcp::socket::shutdown_both);
+        socket.close();
+        throw std::runtime_error(
+            "[protobuf] Unexpected error occurred: 0 bytes sent");
       }
 
       if (callback) callback(bytes);
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+      socket.shutdown(tcp::socket::shutdown_both);
       socket.close();
     });
 
   });
-  std::thread([&](){ io_service.run(); }).join();
+  std::thread([&]() { io_service.run(); }).join();
 }
 
 // Asynchronous reading operation.
@@ -877,11 +874,11 @@ void async_receive(const std::string& port,
       response.ParseFromString(std::string(buffer));
       callback(response);
       acceptor.close();
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
+      socket.shutdown(tcp::socket::shutdown_both);
       socket.close();
     });
   });
-  std::thread([&](){ io_service.run(); }).join();
+  std::thread([&]() { io_service.run(); }).join();
 }
 
 }  // namespace protobuf
