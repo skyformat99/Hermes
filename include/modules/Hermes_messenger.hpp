@@ -109,8 +109,12 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
   Session<T>& session() { return session_; }
 
   void stop() {
+    asio::error_code error;
+
     socket_.get_io_service().stop();
     session_.stop();
+    socket_.shutdown(T::shutdown_both, error);
+    if (error) throw asio::system_error(error);
     socket_.close();
   }
 
@@ -160,7 +164,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
                        [&](const asio::error_code error, std::size_t bytes) {
       if (error) throw asio::system_error(error);
 
-      if (not bytes or bytes != std::string(buffer).size()) {
+      if (not bytes) {
         throw std::runtime_error(
             "[Messenger] async_send failed. Unexpected error occurred.");
       }
@@ -179,7 +183,7 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
         asio::buffer(buffer, BUFFER_SIZE),
         [&](const asio::error_code& error, std::size_t bytes) {
 
-          if (error and error != asio::error::eof)
+          if (error)
             throw asio::system_error(error);
 
           if (not bytes or std::string(buffer).empty()) {
@@ -241,7 +245,9 @@ class Client : public Software {
     set_disconnection_handler(nullptr);
   }
 
+  Client(Client&&) = delete;
   Client(const Client&) = delete;
+  Client& operator=(Client&&) = delete;
   Client& operator=(const Client&) = delete;
 
   ~Client() noexcept {
@@ -395,8 +401,11 @@ class TCP_Server : public Software {
     }
   }
 
+  TCP_Server(TCP_Server&&) = delete;
   TCP_Server(const TCP_Server&) = delete;
+  TCP_Server& operator=(TCP_Server&&) = delete;
   TCP_Server& operator=(const TCP_Server&) = delete;
+
 
   ~TCP_Server() noexcept { disconnect(); }
 
@@ -530,7 +539,9 @@ class Messenger {
     initialize_software(host, port);
   }
 
+  Messenger(Messenger&&) = delete;
   Messenger(const Messenger&) = delete;
+  Messenger& operator=(Messenger&&) = delete;
   Messenger& operator=(const Messenger&) = delete;
   ~Messenger() noexcept {}
 
