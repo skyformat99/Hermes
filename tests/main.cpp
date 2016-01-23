@@ -222,7 +222,7 @@ SCENARIO(
 
       std::thread b([&](){
         for (int i = 0 ; i < 100; i++) {
-          std::this_thread::sleep_for(std::chrono::microseconds(150));
+          std::this_thread::sleep_for(std::chrono::microseconds(250));
           Hermes::protobuf::async_send<com::Message>("127.0.0.1", "8888", message, [](std::size_t bytes){
             REQUIRE(bytes == 49);
           });
