@@ -379,17 +379,14 @@ class Client : public Software {
 
 class TCP_Server : public Software {
  public:
-  TCP_Server(const std::string& host, const std::string& port, bool async)
+  TCP_Server(const std::string& port, bool async)
       : async_(async),
-        host_(host),
         port_(port),
         acceptor_(io_service_),
         stream_(Stream<tcp::socket>::create(io_service_)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
-    tcp::resolver resolver(io_service_);
-    tcp::resolver::query query(host_, port_);
-    tcp::endpoint endpoint = *resolver.resolve(query);
+    tcp::endpoint endpoint(tcp::v4(), std::stoi(port));
     acceptor_.open(endpoint.protocol());
     acceptor_.set_option(tcp::acceptor::reuse_address(true));
     acceptor_.bind(endpoint);
@@ -410,7 +407,6 @@ class TCP_Server : public Software {
 
  private:
   bool async_;
-  std::string host_;
   std::string port_;
   asio::io_context io_service_;
   asio::ip::tcp::acceptor acceptor_;
@@ -458,8 +454,8 @@ class TCP_Server : public Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from: " + host_ +
-                               ":" + port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] Receiving data from port: "
+                                + port_ + " failed. 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -577,6 +573,7 @@ class Messenger {
   //    bit field: 76543210
   //        * 0 = client   2 = tcp    4 = async
   //        * 1 = server   3 = udp    5-7 = unused (future feature).
+  //        * thinking to dedicate 5th bit to type of ip (v4/v6).
   //    If according bit is set to 1, specification is required.
   void resolve_software(const std::string& software,
                         const std::string& protocol) {
@@ -618,7 +615,7 @@ class Messenger {
         break;
 
       case TCP_SERVER:
-        messenger_ = std::make_shared<TCP_Server>(host, port, async_);
+        messenger_ = std::make_shared<TCP_Server>(port, async_);
         break;
 
       // case UDP_SERVER:
