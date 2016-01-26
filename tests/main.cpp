@@ -240,23 +240,24 @@ SCENARIO(
   "Hermes is able to create Messengers (network software)",
   "[Messenger]") {
 
-  GIVEN("TCP server / client") {
-      WHEN("you synchronously send/receive one message") {
-         std::thread a([](){
-          auto server = new Hermes::Messenger("server", "tcp", true, "8888");
-          server->set_connection_handler([&](){
-            auto response = server->receive();
-            REQUIRE(response == "123456789");
-            server->disconnect();
-          });
+  GIVEN("Synchronous TCP server/client") {
+      auto server = new Hermes::Messenger("server", "tcp", false, "8888");
+      auto client = new Hermes::Messenger("client", "tcp", false, "8888");
+
+      WHEN("you synchronously send one message from a thread"
+          " and receive it from another.") {
+         std::thread a([&](){
           server->run();
+          auto response = server->receive();
+          REQUIRE(response == "123456789");
+          server->disconnect();
         });
 
-        std::thread b([](){
+        std::thread b([&](){
           std::this_thread::sleep_for(std::chrono::microseconds(250));
-          auto client = new Hermes::Messenger("client", "tcp", false, "8888");
           client->run();
           client->send("123456789");
+          client->disconnect();
         });
 
         a.join();

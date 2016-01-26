@@ -386,16 +386,7 @@ class TCP_Server : public Software {
         stream_(Stream<tcp::socket>::create(io_service_)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
-    tcp::endpoint endpoint(tcp::v4(), std::stoi(port));
-    acceptor_.open(endpoint.protocol());
-    acceptor_.set_option(tcp::acceptor::reuse_address(true));
-    acceptor_.bind(endpoint);
-    if (async_) {
-      acceptor_.listen();
-      acceptor_.async_accept(
-          stream_->socket(),
-          [&](const asio::error_code& error) { handle_accept(error); });
-    }
+    async_ ? init_async_server() : init_sync_server();
   }
 
   TCP_Server(TCP_Server&&) = delete;
@@ -415,6 +406,16 @@ class TCP_Server : public Software {
  public:
   void run() {
     if (not async_) {
+      asio::error_code error;
+
+      acceptor_.accept(stream_->socket(), error);
+
+      if (error) {
+        disconnect();
+        throw asio::system_error(error);
+      }
+
+      if (connect_handler_) connect_handler_();
       return;
     }
 
@@ -454,8 +455,8 @@ class TCP_Server : public Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from port: "
-                                + port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] Receiving data from port: " +
+                               port_ + " failed. 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -492,6 +493,23 @@ class TCP_Server : public Software {
   }
 
  private:
+  void init_async_server() {
+    tcp::endpoint endpoint(tcp::v4(), std::stoi(port_));
+    acceptor_.open(endpoint.protocol());
+    acceptor_.set_option(tcp::acceptor::reuse_address(true));
+    acceptor_.bind(endpoint);
+    acceptor_.listen();
+    acceptor_.async_accept(
+        stream_->socket(),
+        [&](const asio::error_code& error) { handle_accept(error); });
+  }
+
+  void init_sync_server() {
+    acceptor_ =
+        tcp::acceptor(io_service_, tcp::endpoint(tcp::v4(), std::stoi(port_)));
+    acceptor_.set_option(tcp::acceptor::reuse_address(true));
+  }
+
   void handle_accept(const asio::error_code& error) {
     if (error) {
       disconnect();
