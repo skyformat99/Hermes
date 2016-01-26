@@ -19,6 +19,8 @@ Note: JSON is not handled by default, because all famous library has a to_string
     That's why, you will find them into the repository include/modules.
 
 
+
+
 ## Messenger
 
   As i said earlier, Messenger allows you to create network softwares.You have
@@ -31,7 +33,8 @@ Note: JSON is not handled by default, because all famous library has a to_string
   Below, you will find how to declare a Messenger, available methods that you could use to
   manipulate your software and many examples.
 
-#### Declaration
+
+#### Constructor
 
 ```c++
   #include "Hermes.hpp"
@@ -43,14 +46,6 @@ Note: JSON is not handled by default, because all famous library has a to_string
             bool async,
             const std::string& port,
             const std::string& host = "127.0.0.1");
-
-
-  // Asynchronous TCP server listenning on port 5050
-  Messenger server("server", "tcp", true, "5050");
-
-
-  // Synchronous UDP client
-  Messenger client("client", "UDP", false, "8080", "192.168.1.18");
 ```
 
 #### Software Methods
@@ -83,11 +78,105 @@ Note: JSON is not handled by default, because all famous library has a to_string
     // NOTE: to perform asynchronous operations you have to specify it to your messenger.
 ```
 
+#### Synchronous softwares.
+
+- Exemple 1: Client
+
+```c++
+  #include "Hermes.hpp"
+
+  #include <iostream>
+
+  using namespace Hermes;
+
+  // In the following examples, i will show how to use the software methods
+  // for each protocol.
+  // I start by declaring two pointers on 2 different messengers, one TCP the
+  // other UDP, both client.
+
+  // a Synchronous TCP client
+  // no host provided, so by default it's localhost
+  auto tcp_client = new Messenger("client", "tcp", false, "5050");
+
+  // a Synchronous UDP client
+  auto udp_client = new Messenger("client", "udp", false, "5050", "192.1681.13");
+
+
+  auto co = [](){
+    std::cout << "connected :)" << std::endl;
+  };
+
+
+  auto deco = []() {
+    std::cout << "disconnected :)" << std::endl;
+  };
+
+
+  // Connect client
+  tcp_client->run();
+  udp_client->run();
+
+  // Execute a handler at the connection of the client
+  tcp_client->set_connection_handler(co); // you have to set the handler before call run.
+  tcp_client->run();
+
+  udp_client->set_connection_handler(co); // same here
+  udp_client->run();
+
+  // If you want your client to perform an operation at the connection
+  // you could do something like this
+  tcp_client->set_connection_handler([&](){
+      tcp_client->send("message");
+      auto message = tcp_client->receive();
+  });
+
+  tcp_client->run();
+
+  // same for UDP
+  udp_client->set_connection_handler([&](){
+      udp_client->send("message");
+      auto message = udp_client->receive();
+  });
+
+  udp_client->run();
+
+  // Following the same idea you have the possibility to set a disconnection handler.
+  // It works as the connection handler and you also have to set it before call
+  // the disconnection of your client.
+  // NOTE: In case of error, the disconnect method is called before throwing the error
+  //       so the handler too if you had set one.
+
+  // send/receive operations
+  auto bytes = tcp_client->send("message");
+  auto response = client->receive();
+
+  std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
+  std::cout << "message received by tcp: " << response << std::endl;
+
+
+  // same for udp
+  auto bytes = udp_client->send("message");
+  auto response = udp_client->receive();
+
+  std::cout << "number of bytes send by udp: " << bytes << std::endl;
+  std::cout << "message received by udp: " << response << std::endl;
+```
+
+- Exemple 2: Server
+
+```c++
+```
+
+
+
+
 ## Serialization
 
 The purpose of Hermes serialization part is to provide a really simple use of sending/receiving serialized data. You just have to write a single line to send or receive a serialized object (only to send and receive not to create the object itself or to set its data).
 
+
 #### protobuf
+
 
 Google Protocol Buffers are a language-neutral, platform-neutral, mechanism
 for serializing structured data.
@@ -125,12 +214,12 @@ One more thing, as you should know, using protobuf involves to having defined a 
                      const std::function<void(T)>& callback);
 
 ```
+
 ##### Desgign - Examples
 
 - Example 1: Synchronous send/receive operations.
 
 ```c++
-{
   #include "Hermes.hpp"
 
   #include <string
@@ -155,13 +244,10 @@ One more thing, as you should know, using protobuf involves to having defined a 
 
   // Do stuff with response
   auto descriptor = response.GetDescriptor();
-}
-
 ```
 - Example 2: Asynchronous send/receive operations.
 
 ```c++
-{
   #include "Hermes.hpp"
 
   #include <string>
@@ -193,8 +279,6 @@ One more thing, as you should know, using protobuf involves to having defined a 
       auto descriptor = response.GetDescriptor();
   });
 
-}
-
 ```
 
 Note: The socket is shutdown and close after any Hermes protobuf operations.
@@ -204,7 +288,10 @@ Take a look to the protobuf tests, it may be usefull:
 
 
 #### flatbuffers
+
+
 Inconming.
+
 
 
 

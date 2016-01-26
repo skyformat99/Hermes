@@ -275,6 +275,7 @@ class Client : public Software {
     if (not async_) {
       stream_->socket().connect(endpoint);
       connected_ = true;
+      if (connect_handler_) connect_handler_();
       return;
     }
 
@@ -455,8 +456,8 @@ class TCP_Server : public Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from port: " +
-                               port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] Receiving data from port: "
+                                + port_ + " failed. 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -505,8 +506,7 @@ class TCP_Server : public Software {
   }
 
   void init_sync_server() {
-    acceptor_ =
-        tcp::acceptor(io_service_, tcp::endpoint(tcp::v4(), std::stoi(port_)));
+    acceptor_ = tcp::acceptor(io_service_, tcp::endpoint(tcp::v4(), std::stoi(port_)));
     acceptor_.set_option(tcp::acceptor::reuse_address(true));
   }
 
