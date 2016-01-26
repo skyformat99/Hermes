@@ -80,7 +80,7 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 #### Synchronous softwares.
 
-- Exemple 1: Client
+- Exemple 1: TCP Client
 
 ```c++
   #include "Hermes.hpp"
@@ -89,17 +89,9 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
   using namespace Hermes;
 
-  // In the following examples, i will show how to use the software methods
-  // for each protocol.
-  // I start by declaring two pointers on 2 different messengers, one TCP the
-  // other UDP, both client.
-
   // a Synchronous TCP client
   // no host provided, so by default it's localhost
   auto tcp_client = new Messenger("client", "tcp", false, "5050");
-
-  // a Synchronous UDP client
-  auto udp_client = new Messenger("client", "udp", false, "5050", "192.1681.13");
 
 
   auto co = [](){
@@ -107,21 +99,13 @@ Note: JSON is not handled by default, because all famous library has a to_string
   };
 
 
-  auto deco = []() {
-    std::cout << "disconnected :)" << std::endl;
-  };
-
-
   // Connect client
   tcp_client->run();
-  udp_client->run();
 
   // Execute a handler at the connection of the client
   tcp_client->set_connection_handler(co); // you have to set the handler before call run.
   tcp_client->run();
 
-  udp_client->set_connection_handler(co); // same here
-  udp_client->run();
 
   // If you want your client to perform an operation at the connection
   // you could do something like this
@@ -132,14 +116,6 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
   tcp_client->run();
 
-  // same for UDP
-  udp_client->set_connection_handler([&](){
-      udp_client->send("message");
-      auto message = udp_client->receive();
-  });
-
-  udp_client->run();
-
   // Following the same idea you have the possibility to set a disconnection handler.
   // It works like the connection handler and you also have to set it before call
   // the disconnection of your client.
@@ -148,23 +124,60 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
   // send/receive operations
   auto bytes = tcp_client->send("message");
-  auto response = client->receive();
+  auto response = tcp_client->receive();
 
   std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
   std::cout << "message received by tcp: " << response << std::endl;
-
-
-  // same for udp
-  auto bytes = udp_client->send("message");
-  auto response = udp_client->receive();
-
-  std::cout << "number of bytes send by udp: " << bytes << std::endl;
-  std::cout << "message received by udp: " << response << std::endl;
 ```
 
-- Exemple 2: Server
+- Exemple 2: TCP Server
 
 ```c++
+  #include "Hermes.hpp"
+
+  #include <iostream>
+
+  using namespace Hermes;
+
+  // a Synchronous TCP server
+  auto tcp_server = new Messenger("server", "tcp", false, "5050");
+
+
+auto co = [](){
+  std::cout << "got connection :)" << std::endl;
+};
+
+
+// Start server
+tcp_server->run();
+
+// Execute a handler when you have a connection
+tcp_server->set_connection_handler(co); // you have to set the handler before call run.
+tcp_server->run();
+
+
+// If you want your server to perform an operation when he has a connection
+// you could do something like this
+tcp_server->set_connection_handler([&](){
+    tcp_server->send("message");
+    auto message = tcp_server->receive();
+});
+
+tcp_server->run();
+
+// Following the same idea you have the possibility to set a disconnection handler.
+// It works like the connection handler and you also have to set it before call
+// the disconnection of your client.
+// NOTE: In case of error, the disconnect method is called before throwing the error
+//       so the handler too if you had set one.
+
+// send/receive operations
+auto bytes = tcp_server->send("message");
+auto response = tcp_server->receive();
+
+std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
+std::cout << "message received by tcp: " << response << std::endl;
+
 ```
 
 

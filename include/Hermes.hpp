@@ -42,6 +42,16 @@ enum socket_state { UNUSED = 0, READING, WRITTING };
 enum software_type { NONE = 0, TCP_CLIENT, UDP_CLIENT, TCP_SERVER, UDP_SERVER };
 typedef asio::basic_waitable_timer<std::chrono::system_clock> deadline_timer;
 
+/**
+*
+*
+*
+*
+*
+*
+*
+*
+*/
 template <class T>
 class Session {
  public:
@@ -97,6 +107,16 @@ class Session {
   std::map<std::string, bool> options_;
 };
 
+/**
+*
+*
+*
+*
+*
+*
+*
+*
+*/
 template <typename T>
 class Stream : public std::enable_shared_from_this<Stream<T>> {
  public:
@@ -205,6 +225,16 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
   Session<T> session_;
 };
 
+/**
+*
+*
+*
+*
+*
+*
+*
+*
+*/
 template <typename T>
 class Datagram : public std::enable_shared_from_this<Datagram<T>> {
  public:
@@ -226,8 +256,16 @@ class Datagram : public std::enable_shared_from_this<Datagram<T>> {
   Session<T> session_;
 };
 
-
-
+/**
+*
+*
+*
+*
+*
+*
+*
+*
+*/
 class Software {
  public:
   virtual ~Software() {}
@@ -259,8 +297,11 @@ class Software {
 *
 *
 *
-*/
-class TCP_Client : public Software {
+*
+*
+*
+*
+*/class TCP_Client : public Software {
  public:
   TCP_Client(asio::io_context& io_service, const std::string& host,
          const std::string& port, bool async)
@@ -408,6 +449,16 @@ class TCP_Client : public Software {
   }
 };
 
+/**
+*
+*
+*
+*
+*
+*
+*
+*
+*/
 class TCP_Server : public Software {
  public:
   TCP_Server(const std::string& port, bool async)
@@ -561,6 +612,10 @@ class TCP_Server : public Software {
 *
 *
 *
+*
+*
+*
+*
 */
 class UDP_Client : public Software {
 public:
@@ -607,6 +662,10 @@ public:
 };
 
 /**
+*
+*
+*
+*
 *
 *
 *
@@ -831,7 +890,7 @@ class Messenger {
 *
 * @see:
 *   design:
-        https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*       https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
 *   exemples:
 *       https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp
 */
