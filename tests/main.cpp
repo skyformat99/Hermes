@@ -158,7 +158,8 @@ SCENARIO("Hermes is able to create Messengers (network software)",
 
     WHEN(
         "you connect a client to a server running in a separate thread "
-        "and send to it a message at the connection using the connection handler.") {
+        "and send to it a message at the connection using the connection "
+        "handler.") {
       std::thread a([&]() {
         server->run();
         auto response = server->receive();
@@ -168,9 +169,9 @@ SCENARIO("Hermes is able to create Messengers (network software)",
 
       std::thread b([&]() {
         std::this_thread::sleep_for(std::chrono::microseconds(250));
-        client->set_connection_handler([&](){
-        client->send("123456789");
-        client->disconnect();
+        client->set_connection_handler([&]() {
+          client->send("123456789");
+          client->disconnect();
         });
         client->run();
       });
@@ -181,9 +182,10 @@ SCENARIO("Hermes is able to create Messengers (network software)",
 
     WHEN(
         "you connect a client to a server running in a separate thread "
-        "and the server send you a message at the connection using the connection handler.") {
+        "and the server send you a message at the connection using the "
+        "connection handler.") {
       std::thread a([&]() {
-        server->set_connection_handler([&](){
+        server->set_connection_handler([&]() {
           server->send("987654321");
           server->disconnect();
         });
@@ -207,7 +209,7 @@ SCENARIO("Hermes is able to create Messengers (network software)",
         "and you use the disconnect handlers.") {
       std::thread a([&]() {
 
-        auto f = [](){
+        auto f = []() {
           bool test = false;
 
           REQUIRE(not test);
@@ -221,7 +223,7 @@ SCENARIO("Hermes is able to create Messengers (network software)",
       std::thread b([&]() {
         std::this_thread::sleep_for(std::chrono::microseconds(250));
 
-        auto f = [](){
+        auto f = []() {
           bool test = true;
 
           REQUIRE(test);
@@ -240,7 +242,6 @@ SCENARIO("Hermes is able to create Messengers (network software)",
   GIVEN("Synchronous UDP client/server") {
     auto server = new Hermes::Messenger("serVeR", "UDP", false, "8888");
     auto client = new Hermes::Messenger("CliEnT", "udP", false, "8888");
-
   }
 }
 

@@ -143,40 +143,40 @@ Note: JSON is not handled by default, because all famous library has a to_string
   auto tcp_server = new Messenger("server", "tcp", false, "5050");
 
 
-auto co = [](){
-  std::cout << "got connection :)" << std::endl;
-};
+  auto co = [](){
+    std::cout << "got connection :)" << std::endl;
+  };
 
 
-// Start server
-tcp_server->run();
+  // Start server
+  tcp_server->run();
 
-// Execute a handler when you have a connection
-tcp_server->set_connection_handler(co); // you have to set the handler before call run.
-tcp_server->run();
+  // Execute a handler when you have a connection
+  tcp_server->set_connection_handler(co); // you have to set the handler before call run.
+  tcp_server->run();
 
 
-// If you want your server to perform an operation when he has a connection
-// you could do something like this
-tcp_server->set_connection_handler([&](){
-    tcp_server->send("message");
-    auto message = tcp_server->receive();
-});
+  // If you want your server to perform an operation when he has a connection
+  // you could do something like this
+  tcp_server->set_connection_handler([&](){
+      tcp_server->send("message");
+      auto message = tcp_server->receive();
+    });
 
-tcp_server->run();
+  tcp_server->run();
 
-// Following the same idea you have the possibility to set a disconnection handler.
-// It works like the connection handler and you also have to set it before call
-// the disconnection of your client.
-// NOTE: In case of error, the disconnect method is called before throwing the error
-//       so the handler too if you had set one.
+  // Following the same idea you have the possibility to set a disconnection handler.
+  // It works like the connection handler and you also have to set it before call
+  // the disconnection of your client.
+  // NOTE: In case of error, the disconnect method is called before throwing the error
+  //       so the handler too if you had set one.
 
-// send/receive operations
-auto bytes = tcp_server->send("message");
-auto response = tcp_server->receive();
+  // send/receive operations
+  auto bytes = tcp_server->send("message");
+  auto response = tcp_server->receive();
 
-std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
-std::cout << "message received by tcp: " << response << std::endl;
+  std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
+  std::cout << "message received by tcp: " << response << std::endl;
 
 ```
 
@@ -328,4 +328,4 @@ Inconming.
   ```
 
 
-Note: All modules are in namespace 'Hermes'.
+Note: All modules are in the namespace 'Hermes'.

@@ -291,7 +291,6 @@ class Software {
   std::function<void()> disconnect_handler_;
 };
 
-
 /**
 *
 *
@@ -301,10 +300,10 @@ class Software {
 *
 *
 *
-*/class TCP_Client : public Software {
+*/ class TCP_Client : public Software {
  public:
   TCP_Client(asio::io_context& io_service, const std::string& host,
-         const std::string& port, bool async)
+             const std::string& port, bool async)
       : async_(async),
         host_(host),
         port_(port),
@@ -339,9 +338,8 @@ class Software {
           "[Messenger] Error: Client already connected to: " + host_ + ":" +
           port_);
 
-    tcp::endpoint endpoint(
-      asio::ip::address::from_string(host_), std::stoi(port_)
-    );
+    tcp::endpoint endpoint(asio::ip::address::from_string(host_),
+                           std::stoi(port_));
 
     if (not async_) {
       stream_->socket().connect(endpoint);
@@ -537,8 +535,8 @@ class TCP_Server : public Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from port: "
-                                + port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] Receiving data from port: " +
+                               port_ + " failed. 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -587,7 +585,8 @@ class TCP_Server : public Software {
   }
 
   void init_sync_server() {
-    acceptor_ = tcp::acceptor(io_service_, tcp::endpoint(tcp::v4(), std::stoi(port_)));
+    acceptor_ =
+        tcp::acceptor(io_service_, tcp::endpoint(tcp::v4(), std::stoi(port_)));
     acceptor_.set_option(tcp::acceptor::reuse_address(true));
   }
 
@@ -618,16 +617,16 @@ class TCP_Server : public Software {
 *
 */
 class UDP_Client : public Software {
-public:
+ public:
   UDP_Client(asio::io_context& io_service, const std::string& host,
-            const std::string &port, bool async)
-  : async_(async),
-    host_(host),
-    port_(port),
-    io_service_(io_service),
-    datagram_(Datagram<udp::socket>::create(io_service)) {
-      set_connection_handler(nullptr);
-      set_disconnection_handler(nullptr);
+             const std::string& port, bool async)
+      : async_(async),
+        host_(host),
+        port_(port),
+        io_service_(io_service),
+        datagram_(Datagram<udp::socket>::create(io_service)) {
+    set_connection_handler(nullptr);
+    set_disconnection_handler(nullptr);
   }
 
   UDP_Client(UDP_Client&&) = delete;
@@ -637,28 +636,27 @@ public:
 
   ~UDP_Client() noexcept { disconnect(); }
 
-  private:
-   bool async_;
-   std::string host_;
-   std::string port_;
-   udp::endpoint endpoint_;
-   asio::io_context::work io_service_;
-   Datagram<udp::socket>::instance datagram_;
+ private:
+  bool async_;
+  std::string host_;
+  std::string port_;
+  udp::endpoint endpoint_;
+  asio::io_context::work io_service_;
+  Datagram<udp::socket>::instance datagram_;
 
  public:
-   void run() {}
+  void run() {}
 
-   void disconnect() {}
+  void disconnect() {}
 
-   std::size_t send(const std::string& message) { return 4; }
+  std::size_t send(const std::string& message) { return 4; }
 
-   std::string receive() {return std::string("");}
+  std::string receive() { return std::string(""); }
 
-   void async_send(const std::string& message,
-                   const std::function<void(std::size_t)>& callback = nullptr) {}
+  void async_send(const std::string& message,
+                  const std::function<void(std::size_t)>& callback = nullptr) {}
 
   void async_receive(const std::function<void(std::string)>& callback) {}
-
 };
 
 /**
@@ -672,13 +670,13 @@ public:
 *
 */
 class UDP_Server : public Software {
-public:
-  UDP_Server(const std::string &port, bool async)
-  : async_(async),
-    port_(port),
-    datagram_(Datagram<udp::socket>::create(io_service_)) {
-      set_connection_handler(nullptr);
-      set_disconnection_handler(nullptr);
+ public:
+  UDP_Server(const std::string& port, bool async)
+      : async_(async),
+        port_(port),
+        datagram_(Datagram<udp::socket>::create(io_service_)) {
+    set_connection_handler(nullptr);
+    set_disconnection_handler(nullptr);
   }
 
   UDP_Server(UDP_Server&&) = delete;
@@ -688,29 +686,27 @@ public:
 
   ~UDP_Server() noexcept { disconnect(); }
 
-  private:
-   bool async_;
-   std::string port_;
-   udp::endpoint endpoint_;
-   asio::io_context io_service_;
-   Datagram<udp::socket>::instance datagram_;
+ private:
+  bool async_;
+  std::string port_;
+  udp::endpoint endpoint_;
+  asio::io_context io_service_;
+  Datagram<udp::socket>::instance datagram_;
 
  public:
-   void run() {}
+  void run() {}
 
-   void disconnect() {}
+  void disconnect() {}
 
-   std::size_t send(const std::string& message) { return 4; }
+  std::size_t send(const std::string& message) { return 4; }
 
-   std::string receive() {return std::string("");}
+  std::string receive() { return std::string(""); }
 
-   void async_send(const std::string& message,
-                   const std::function<void(std::size_t)>& callback = nullptr) {}
+  void async_send(const std::string& message,
+                  const std::function<void(std::size_t)>& callback = nullptr) {}
 
   void async_receive(const std::function<void(std::string)>& callback) {}
-
 };
-
 
 /**
 * Messenger class allows you to create network software.
@@ -830,7 +826,7 @@ class Messenger {
 
       default:
         throw std::runtime_error(
-          "[Messenger] initialize_software: Unexpected occurred.");
+            "[Messenger] initialize_software: Unexpected occurred.");
         break;
     }
   }
