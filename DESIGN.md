@@ -23,11 +23,11 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 ## Messenger
 
-  As i said earlier, Messenger allows you to create network softwares.You have
+  As i said earlier, Messenger allows you to create network softwares. You have
   to define what kind of software you want. Client and server, both alike, could send
   and receive data following TCP or UDP protocol (this also you will have to specify).
-  Messenger has been to be pretty simple to use, and you will have only a few lines to
-  write to perform operations.
+  Messenger has been designed to be pretty simple to use, and you will have only a few lines
+  to write to perform operations.
   Thanks to a boolean, you can specify to your messenger if it has to handle asynchronous
   operations.
   Below, you will find how to declare a Messenger, available methods that you could use to
@@ -141,7 +141,7 @@ Note: JSON is not handled by default, because all famous library has a to_string
   udp_client->run();
 
   // Following the same idea you have the possibility to set a disconnection handler.
-  // It works as the connection handler and you also have to set it before call
+  // It works like the connection handler and you also have to set it before call
   // the disconnection of your client.
   // NOTE: In case of error, the disconnect method is called before throwing the error
   //       so the handler too if you had set one.
@@ -190,9 +190,13 @@ One more thing, as you should know, using protobuf involves to having defined a 
   If you do need help about using protobuf : [`Google Protocol Buffers doc`](https://developers.google.com/protocol-buffers/?hl=en)
 
 
-##### Hermes::protobuf prototype functions
+##### Prototype functions
 
 ```c++
+  #include "Hermes.hpp"
+
+  using namespace Hermes::protobuf;
+
   // Synchronous operations
   template <typename T>
   std::size_t send(const std::string& host,
@@ -251,7 +255,6 @@ One more thing, as you should know, using protobuf involves to having defined a 
   #include "Hermes.hpp"
 
   #include <string>
-  #include <memory>
   #include <iostream>
 
   using namespace Hermes;
