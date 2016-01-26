@@ -205,6 +205,29 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
   Session<T> session_;
 };
 
+template <typename T>
+class Datagram : public std::enable_shared_from_this<Datagram<T>> {
+ public:
+  typedef std::shared_ptr<Datagram<T>> instance;
+
+  static instance create(asio::io_context& io_service) {
+    return instance(new Datagram<T>(io_service));
+  }
+
+  T& socket() { return socket_; }
+  Session<T>& session() { return session_; }
+
+ private:
+  Datagram(asio::io_context& io_service)
+      : socket_(io_service), session_(socket_) {}
+
+ private:
+  T socket_;
+  Session<T> session_;
+};
+
+
+
 class Software {
  public:
   virtual ~Software() {}
@@ -230,27 +253,33 @@ class Software {
   std::function<void()> disconnect_handler_;
 };
 
-template <typename T>
-class Client : public Software {
+
+/**
+*
+*
+*
+*
+*/
+class TCP_Client : public Software {
  public:
-  Client(asio::io_context& io_service, const std::string& host,
+  TCP_Client(asio::io_context& io_service, const std::string& host,
          const std::string& port, bool async)
       : async_(async),
         host_(host),
         port_(port),
         connected_(false),
         service_(io_service),
-        stream_(Stream<typename T::socket>::create(io_service)) {
+        stream_(Stream<tcp::socket>::create(io_service)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
   }
 
-  Client(Client&&) = delete;
-  Client(const Client&) = delete;
-  Client& operator=(Client&&) = delete;
-  Client& operator=(const Client&) = delete;
+  TCP_Client(TCP_Client&&) = delete;
+  TCP_Client(const TCP_Client&) = delete;
+  TCP_Client& operator=(TCP_Client&&) = delete;
+  TCP_Client& operator=(const TCP_Client&) = delete;
 
-  ~Client() noexcept {
+  ~TCP_Client() noexcept {
     if (connected_) disconnect();
   }
 
@@ -260,7 +289,7 @@ class Client : public Software {
   std::string port_;
   std::atomic<bool> connected_;
   asio::io_context::work service_;
-  typename Stream<typename T::socket>::instance stream_;
+  Stream<tcp::socket>::instance stream_;
 
  public:
   void run() {
@@ -269,8 +298,9 @@ class Client : public Software {
           "[Messenger] Error: Client already connected to: " + host_ + ":" +
           port_);
 
-    asio::ip::basic_endpoint<T> endpoint(asio::ip::address::from_string(host_),
-                                         std::stoi(port_));
+    tcp::endpoint endpoint(
+      asio::ip::address::from_string(host_), std::stoi(port_)
+    );
 
     if (not async_) {
       stream_->socket().connect(endpoint);
@@ -527,6 +557,103 @@ class TCP_Server : public Software {
 };
 
 /**
+*
+*
+*
+*
+*/
+class UDP_Client : public Software {
+public:
+  UDP_Client(asio::io_context& io_service, const std::string& host,
+            const std::string &port, bool async)
+  : async_(async),
+    host_(host),
+    port_(port),
+    io_service_(io_service),
+    datagram_(Datagram<udp::socket>::create(io_service)) {
+      set_connection_handler(nullptr);
+      set_disconnection_handler(nullptr);
+  }
+
+  UDP_Client(UDP_Client&&) = delete;
+  UDP_Client(const UDP_Client&) = delete;
+  UDP_Client& operator=(UDP_Client&&) = delete;
+  UDP_Client& operator=(const UDP_Client&) = delete;
+
+  ~UDP_Client() noexcept { disconnect(); }
+
+  private:
+   bool async_;
+   std::string host_;
+   std::string port_;
+   udp::endpoint endpoint_;
+   asio::io_context::work io_service_;
+   Datagram<udp::socket>::instance datagram_;
+
+ public:
+   void run() {}
+
+   void disconnect() {}
+
+   std::size_t send(const std::string& message) { return 4; }
+
+   std::string receive() {return std::string("");}
+
+   void async_send(const std::string& message,
+                   const std::function<void(std::size_t)>& callback = nullptr) {}
+
+  void async_receive(const std::function<void(std::string)>& callback) {}
+
+};
+
+/**
+*
+*
+*
+*
+*/
+class UDP_Server : public Software {
+public:
+  UDP_Server(const std::string &port, bool async)
+  : async_(async),
+    port_(port),
+    datagram_(Datagram<udp::socket>::create(io_service_)) {
+      set_connection_handler(nullptr);
+      set_disconnection_handler(nullptr);
+  }
+
+  UDP_Server(UDP_Server&&) = delete;
+  UDP_Server(const UDP_Server&) = delete;
+  UDP_Server& operator=(UDP_Server&&) = delete;
+  UDP_Server& operator=(const UDP_Server&) = delete;
+
+  ~UDP_Server() noexcept { disconnect(); }
+
+  private:
+   bool async_;
+   std::string port_;
+   udp::endpoint endpoint_;
+   asio::io_context io_service_;
+   Datagram<udp::socket>::instance datagram_;
+
+ public:
+   void run() {}
+
+   void disconnect() {}
+
+   std::size_t send(const std::string& message) { return 4; }
+
+   std::string receive() {return std::string("");}
+
+   void async_send(const std::string& message,
+                   const std::function<void(std::size_t)>& callback = nullptr) {}
+
+  void async_receive(const std::function<void(std::string)>& callback) {}
+
+};
+
+
+/**
 * Messenger class allows you to create network software.
 *
 * @param:
@@ -537,9 +664,10 @@ class TCP_Server : public Software {
 *     - host (set by default to localhost)
 *
 * @see:
-*   design: https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*   design:
+*     https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
 *   exemples:
-*https://github.com/TommyStarK/Hermes/blob/master/tests/messenger.cpp
+*     https://github.com/TommyStarK/Hermes/blob/master/tests/messenger.cpp
 */
 class Messenger {
  public:
@@ -591,8 +719,9 @@ class Messenger {
   //    bit field: 76543210
   //        * 0 = client   2 = tcp    4 = async
   //        * 1 = server   3 = udp    5-7 = unused (future feature).
-  //        * thinking to dedicate 5th bit to type of ip (v4/v6).
   //    If according bit is set to 1, specification is required.
+  //
+  // NOTE: 5th bith will be set to handle type of ip (ipv4/ipv6)
   void resolve_software(const std::string& software,
                         const std::string& protocol) {
     auto s = software;
@@ -624,24 +753,25 @@ class Messenger {
     switch (flag) {
       case TCP_CLIENT:
         messenger_ =
-            std::make_shared<Client<tcp>>(io_service_, host, port, async_);
+            std::make_shared<TCP_Client>(io_service_, host, port, async_);
         break;
 
       case UDP_CLIENT:
         messenger_ =
-            std::make_shared<Client<udp>>(io_service_, host, port, async_);
+            std::make_shared<UDP_Client>(io_service_, host, port, async_);
         break;
 
       case TCP_SERVER:
         messenger_ = std::make_shared<TCP_Server>(port, async_);
         break;
 
-      // case UDP_SERVER:
-      //   messenger_ =
-      //       std::make_shared<Server<udp>>(host, port, async_, UDP_SERVER);
-      //   break;
+      case UDP_SERVER:
+        messenger_ = std::make_shared<UDP_Server>(port, async_);
+        break;
 
       default:
+        throw std::runtime_error(
+          "[Messenger] initialize_software: Unexpected occurred.");
         break;
     }
   }
@@ -674,7 +804,6 @@ class Messenger {
     messenger_->set_disconnection_handler(callback);
   }
 
-  Software* get_messenger() { return messenger_.get(); }
   std::string receive() { return messenger_->receive(); }
   std::size_t send(const std::string& msg) { return messenger_->send(msg); }
 };

@@ -236,6 +236,12 @@ SCENARIO("Hermes is able to create Messengers (network software)",
       b.join();
     }
   }
+
+  GIVEN("Synchronous UDP client/server") {
+    auto server = new Hermes::Messenger("serVeR", "UDP", false, "8888");
+    auto client = new Hermes::Messenger("CliEnT", "udP", false, "8888");
+
+  }
 }
 
 /**
@@ -359,6 +365,7 @@ SCENARIO("Hermes is able to send and receive serialized data.", "[protobuf]") {
                 REQUIRE(response.from() == "from: ok");
                 REQUIRE(response.to() == "to: ok");
                 REQUIRE(response.msg() == "msg: ok");
+                std::cout << ":)\n";
               });
         }
       });
