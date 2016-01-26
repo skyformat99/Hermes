@@ -20,9 +20,68 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 
 ## Messenger
-  Incoming.
+
+  As i said earlier, Messenger allows you to create network softwares.You have
+  to define what kind of software you want. Client and server, both alike, could send
+  and receive data following TCP or UDP protocol (this also you will have to specify).
+  Messenger has been to be pretty simple to use, and you will have only a few lines to
+  write to perform operations.
+  Thanks to a boolean, you can specify to your messenger if it has to handle asynchronous
+  operations.
+  Below, you will find how to declare a Messenger, available methods that you could use to
+  manipulate your software and many examples.
+
+#### Declaration
+
+```c++
+  #include "Hermes.hpp"
+
+  using namespace Hermes;
+
+  Messenger(const std::string& software,
+            const std::string& protocol,
+            bool async,
+            const std::string& port,
+            const std::string& host = "127.0.0.1");
 
 
+  // Asynchronous TCP server listenning on port 5050
+  Messenger server("server", "tcp", true, "5050");
+
+
+  // Synchronous UDP client
+  Messenger client("client", "UDP", false, "8080", "192.168.1.18");
+```
+
+#### Software Methods
+
+```c++
+    #include "Hermes.hpp"
+
+    using namespace Hermes;
+
+    // I will show you how to use these methods appropriately
+    // according the different cases.
+    void run();
+    void disconnect();
+
+    // Synchronous send/receive operation.
+    std::size_t send(const std::string& message);
+    std::string receive();
+
+    // asynchronous send/receive operation
+    void async_send(const std::string& message,
+                    const std::function<void(std::size_t)>& callback = nullptr);
+
+    void async_receive(const std::function<void(std::string)>& callback);
+
+    // Same as run/disconnect i would come back on this later
+    void set_connection_handler(const std::function<void()>& handler);
+    void set_disconnection_handler(const std::function<void()>& handler);
+
+
+    // NOTE: to perform asynchronous operations you have to specify it to your messenger.
+```
 
 ## Serialization
 
@@ -137,6 +196,9 @@ One more thing, as you should know, using protobuf involves to having defined a 
 }
 
 ```
+
+Note: The socket is shutdown and close after any Hermes protobuf operations.
+
 Take a look to the protobuf tests, it may be usefull:
 [`protobuf test`](https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp).
 
