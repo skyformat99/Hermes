@@ -40,13 +40,19 @@ using namespace asio::ip;
 *
 * @see:
 *   design:
-        https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*       https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
 *   exemples:
 *       https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp
 */
 namespace protobuf {
 
 using namespace google::protobuf;
+
+void end_operation(tcp::socket* socket, tcp::acceptor* acceptor = nullptr) {
+  socket->shutdown(tcp::socket::shutdown_both);
+  socket->close();
+  if (acceptor) acceptor->close();
+}
 
 // Synchronous writting operation.
 template <typename T>
@@ -55,7 +61,6 @@ std::size_t send(const std::string& host, const std::string& port,
   assert(message.GetDescriptor() and std::stoi(port) >= 0);
 
   std::string serialized;
-  char buffer[BUFFER_SIZE] = {0};
   asio::io_context io_service;
   asio::error_code error = asio::error::host_not_found;
 
@@ -64,26 +69,22 @@ std::size_t send(const std::string& host, const std::string& port,
   auto endpoint = resolver.resolve(tcp::resolver::query(host, port));
 
   message.SerializeToString(&serialized);
-  std::strcpy(buffer, serialized.c_str());
   asio::connect(socket, endpoint, error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-    socket.close();
+    end_operation(&socket);
     throw std::runtime_error("[protobuf] Connection to host: " + host +
                              " port: " + port + " failed.");
   }
 
-  asio::write(socket, asio::buffer(buffer, serialized.size()), error);
+  asio::write(socket, asio::buffer(serialized.data(), serialized.size()), error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-    socket.close();
+    end_operation(&socket);
     throw asio::system_error(error);
   }
 
-  socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-  socket.close();
+  end_operation(&socket);
   return serialized.size();
 }
 
@@ -97,34 +98,25 @@ T receive(const std::string& port) {
 
   tcp::socket socket(io_service);
   tcp::acceptor acceptor(io_service, tcp::endpoint(tcp::v4(), std::stoi(port)));
-  acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+  acceptor.set_option(tcp::acceptor::reuse_address(true));
   acceptor.accept(socket, error);
 
   if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-    socket.close();
-    acceptor.close();
+    end_operation(&socket, &acceptor);
     throw std::runtime_error("[protobuf] Accepting connection on port: " +
                              port + " failed.");
   }
 
   socket.read_some(asio::buffer(buffer), error);
 
-  if (error == asio::error::eof) {
-    acceptor.close();
-    throw std::runtime_error("[protobuf] connection closed.");
-  } else if (error) {
-    socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-    socket.close();
-    acceptor.close();
+  if (error) {
+    end_operation(&socket, &acceptor);
     throw asio::system_error(error);
   }
 
   T result;
   result.ParseFromString(std::string(buffer));
-  socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-  socket.close();
-  acceptor.close();
+  end_operation(&socket, &acceptor);
   return result;
 }
 
@@ -133,8 +125,6 @@ void async_send(const std::string& host, const std::string& port,
                 const T& message,
                 const std::function<void(std::size_t)>& callback = nullptr) {
   assert(message.GetDescriptor() and std::stoi(port) >= 0);
-
-  char buffer[BUFFER_SIZE] = {0};
   std::string serialized;
   asio::io_context io_service;
 
@@ -146,32 +136,27 @@ void async_send(const std::string& host, const std::string& port,
                        [&](const asio::error_code& error) {
 
     if (error) {
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket.close();
+      end_operation(&socket);
       throw std::runtime_error("[protobuf] Connection to host: " + host +
                                " port: " + port + " failed.");
     }
 
-    std::strcpy(buffer, serialized.c_str());
-    asio::async_write(socket, asio::buffer(buffer, serialized.size()),
+    asio::async_write(socket, asio::buffer(serialized.data(), serialized.size()),
                       [&](const asio::error_code& error, std::size_t bytes) {
 
       if (error) {
-        socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-        socket.close();
+        end_operation(&socket);
         throw std::system_error(error);
       }
 
       if (not bytes) {
-        socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-        socket.close();
+        end_operation(&socket);
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes sent");
       }
 
       if (callback) callback(bytes);
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket.close();
+      end_operation(&socket);
     });
 
   });
@@ -198,27 +183,21 @@ void async_receive(const std::string& port,
   acceptor.async_accept(socket, [&](const asio::error_code& error) {
 
     if (error) {
-      socket.shutdown(tcp::socket::shutdown_both);
-      socket.close();
-      acceptor.close();
-      throw std::runtime_error("[protobuf] Accept connection on port: " + port +
-                               " failed.");
+      end_operation(&socket, &acceptor);
+      throw std::runtime_error("[protobuf] Accepting connection on port: " +
+                               port + " failed.");
     }
 
     asio::async_read(socket, asio::buffer(buffer, BUFFER_SIZE),
                      [&](const asio::error_code& error, std::size_t bytes) {
 
       if (error and error != asio::error::eof) {
-        socket.shutdown(tcp::socket::shutdown_both);
-        socket.close();
-        acceptor.close();
+        end_operation(&socket, &acceptor);
         throw asio::system_error(error);
       }
 
       if (not bytes or std::string(buffer).empty()) {
-        acceptor.close();
-        socket.shutdown(tcp::socket::shutdown_both);
-        socket.close();
+        end_operation(&socket, &acceptor);
         throw std::runtime_error(
             "[protobuf] Unexpected error occurred: 0 bytes received");
       }
@@ -226,9 +205,7 @@ void async_receive(const std::string& port,
       T response;
       response.ParseFromString(std::string(buffer));
       callback(response);
-      acceptor.close();
-      socket.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket.close();
+      end_operation(&socket, &acceptor);
     });
   });
   std::thread([&]() { io_service.run(); }).join();

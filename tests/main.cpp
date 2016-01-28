@@ -11,6 +11,10 @@
 *
 */
 
+
+//
+// testing Session object
+//
 SCENARIO("Session object, a socket options manager.", "[Messenger::session]") {
   GIVEN("Session class") {
     asio::io_context io_service;
@@ -54,10 +58,13 @@ SCENARIO("Session object, a socket options manager.", "[Messenger::session]") {
   }
 }
 
+//
+// testing stream's session
+//
 SCENARIO(
-    "Messenger owns a stream. This object handles operations on a socket. "
-    "To manage those operations the object stream owns a session object"
-    "which is responsible of socket's options",
+    "Stream class represents a TCP connection. Stream manages operations "
+    "on the socket. Furthermore, options can be set to the socket. Stream class "
+    "owns a session object, managing socket's option.",
     "[stream]") {
   GIVEN("TCP stream") {
     asio::io_context io_service;
@@ -108,8 +115,66 @@ SCENARIO(
   }
 }
 
-SCENARIO("Hermes is able to create Messengers (network software)",
-         "[Messenger]") {
+//
+// testing datagram's session
+//
+SCENARIO(
+    "Datagram class is a handler to manage UDP operations on a socket "
+    "Same as Stream, Datagram owns a session object to handle socket's option.",
+    "[datagram]") {
+  GIVEN("UDP datagram") {
+    asio::io_context io_service;
+
+    auto datagram = Hermes::Stream<asio::ip::udp::socket>::create(io_service);
+
+    WHEN("when you check session options") {
+      REQUIRE(datagram);
+      REQUIRE(not datagram->socket().is_open());
+      REQUIRE(datagram->session().is_socket_unused());
+      REQUIRE(not datagram->session().is_ready_for_writting());
+      REQUIRE(not datagram->session().is_ready_for_reading());
+      REQUIRE(not datagram->session().is_option_activated("state"));
+      REQUIRE(not datagram->session().is_option_activated("deadline"));
+      REQUIRE(not datagram->session().is_option_activated("heartbeat"));
+      REQUIRE(datagram->session().get_heartbeat_message() == "<3");
+    }
+  }
+
+  GIVEN("UDP datagram") {
+    asio::io_context io_service;
+
+    auto datagram = Hermes::Stream<asio::ip::udp::socket>::create(io_service);
+
+    WHEN("You set state READING to socket.") {
+      datagram->session().set_state_to_socket(Hermes::READING);
+      REQUIRE(not datagram->session().is_socket_unused());
+      REQUIRE(not datagram->session().is_ready_for_writting());
+      REQUIRE(datagram->session().is_ready_for_reading());
+    }
+
+    WHEN("You set state WRITTING to socket.") {
+      datagram->session().set_state_to_socket(Hermes::WRITTING);
+      REQUIRE(not datagram->session().is_socket_unused());
+      REQUIRE(datagram->session().is_ready_for_writting());
+      REQUIRE(not datagram->session().is_ready_for_reading());
+    }
+
+    WHEN("You set a new heartbeat message.") {
+      datagram->session().set_heartbeat_message("test");
+      REQUIRE_NOTHROW(datagram->session().get_heartbeat_message() == "test");
+    }
+
+    WHEN("You open the socket.") {
+      datagram->socket().open(asio::ip::udp::v4());
+      REQUIRE(datagram->socket().is_open());
+    }
+  }
+}
+
+//
+// testing Synchronous tcp softwares
+//
+SCENARIO("Hermes is able to create Messengers", "[Messenger]") {
   GIVEN("Synchronous TCP server/client") {
     auto server = new Hermes::Messenger("server", "tcp", false, "8888");
     auto client = new Hermes::Messenger("CliEnT", "TcP", false, "8888");
@@ -238,12 +303,162 @@ SCENARIO("Hermes is able to create Messengers (network software)",
       b.join();
     }
   }
+}
 
-  GIVEN("Synchronous UDP client/server") {
-    auto server = new Hermes::Messenger("serVeR", "UDP", false, "8888");
-    auto client = new Hermes::Messenger("CliEnT", "udP", false, "8888");
+
+//
+// testing asynchronous tcp softwares
+//
+SCENARIO(
+  "Hermes is able to create Messengers able to perform asynchronous operations",
+  "[messenger]") {
+  GIVEN("Asynchronous TCP client/server") {
+    auto server = new Hermes::Messenger("serVeR", "tcp", true, "8888");
+    auto client = new Hermes::Messenger("CliEnT", "tcp", true, "8888");
+
+    WHEN("you connect a client to a server running in a separate thread "
+         "and asynchronously send/receive message from server.") {
+
+      std::thread a([&](){
+
+        server->set_connection_handler([&server = server]() {
+          auto response = server->receive();
+          REQUIRE(response == "test ?");
+          server->send("test ok");
+          server->disconnect();
+        });
+        server->run();
+      });
+
+      std::thread b([&](){
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        client->set_connection_handler([&](){
+          client->async_send("test ?", [](std::size_t bytes) { REQUIRE(bytes == 6); });
+          client->async_receive([](std::string msg) { REQUIRE(msg == "test ok"); });
+          client->disconnect();
+        });
+        client->run();
+      });
+
+
+      a.join();
+      b.join();
+    }
+  }
+
+  GIVEN("Asynchronous TCP client/server") {
+    auto server = new Hermes::Messenger("serVeR", "tcp", true, "8888");
+
+    WHEN("you connect then disconnect 100 clients to a server running in a separate thread.") {
+
+      std::thread a([&](){
+
+        int i = 0;
+
+        server->set_connection_handler([&]() {
+          std::cout << "connection n° " << i++ << std::endl;
+          if (i == 100)
+            server->disconnect();
+        });
+        server->run();
+      });
+
+      std::thread b([&](){
+        for (int i = 0; i < 100; i++) {
+          auto client = new Hermes::Messenger("client", "tcp", true, "8888");
+
+          std::this_thread::sleep_for(std::chrono::microseconds(250));
+          client->set_connection_handler([&](){
+            std::cout << "client n° " << i << " connected :)" << std::endl;
+            client->disconnect();
+          });
+          client->run();
+        }
+      });
+
+      a.join();
+      b.join();
+    }
+  }
+
+  GIVEN("Asynchronous TCP client/server") {
+    auto server = new Hermes::Messenger("serVeR", "tcp", true, "8888");
+
+    WHEN("you do 100 times: connect a client send/receive a message to a server running "
+         "in a separate thread.") {
+
+      std::thread a([&](){
+
+        int i = 0;
+
+        server->set_connection_handler([&]() {
+          i++;
+          auto response = server->receive();
+          REQUIRE(response == "(.)(.)");
+          server->send("<3");
+          if (i == 100)
+            server->disconnect();
+        });
+        server->run();
+      });
+
+      std::thread b([&](){
+        for (int i = 0; i < 100; i++) {
+          auto client = new Hermes::Messenger("client", "tcp", true, "8888");
+
+          std::this_thread::sleep_for(std::chrono::microseconds(250));
+          client->set_connection_handler([&](){
+            client->async_send("(.)(.)", [](std::size_t b) { REQUIRE(b == 6); });
+            client->async_receive([](std::string msg) { REQUIRE(msg == "<3"); });
+            client->disconnect();
+          });
+          client->run();
+        }
+      });
+
+      a.join();
+      b.join();
+    }
   }
 }
+
+
+//
+// testing synchronous udp softwares
+//
+// SCENARIO() {
+//   GIVEN("Synchronous UDP client/server") {
+//     auto server = new Hermes::Messenger("serVeR", "UDP", false, "8888");
+//     auto client = new Hermes::Messenger("CliEnT", "udP", false, "8888");
+//
+//     WHEN("you send a message") {
+//
+//       std::thread a([&](){
+//         server->run();
+//         auto response = server->receive();
+//         std::cout << response << std::endl;
+//         server->disconnect();
+//       });
+//
+//       std::thread b([&](){
+//           std::this_thread::sleep_for(std::chrono::microseconds(250));
+//           client->run();
+//           client->send("123456789\n");
+//           client->send("987654321\n");
+//           // auto response = client->receive();
+//           // std::cout << response << std::endl;
+//           client->disconnect();
+//       });
+//
+//
+//       a.join();
+//       b.join();
+//     }
+//   }
+// }
+
+
+
 
 /**
 *

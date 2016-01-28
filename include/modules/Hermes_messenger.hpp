@@ -14,11 +14,11 @@
 #include <assert.h>
 #undef NDEBUG
 
-#include "google/protobuf/message.h"
 #include "asio.hpp"
+#include "google/protobuf/message.h"
 
-#define BUFFER_SIZE 2048
 #define THREAD_POOL 100
+#define BUFFER_SIZE 2048
 
 namespace Hermes {
 
@@ -132,7 +132,6 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
   void stop() {
     asio::error_code error;
 
-    socket_.get_io_service().stop();
     session_.stop();
     socket_.shutdown(T::shutdown_both, error);
     if (error) throw asio::system_error(error);
@@ -141,13 +140,11 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
 
   std::tuple<asio::error_code, std::size_t> send(const std::string& message) {
     asio::error_code error;
-    char buffer[BUFFER_SIZE] = {0};
 
-    if (not message.size() or message.size() > BUFFER_SIZE)
+    if (not message.size())
       return std::make_tuple(asio::error::message_size, 0);
 
-    std::strcpy(buffer, message.c_str());
-    socket_.send(asio::buffer(buffer, message.size()), 0, error);
+    socket_.send(asio::buffer(message.data(), message.size()), 0, error);
 
     if (error) return std::make_tuple(error, 0);
 
@@ -168,21 +165,13 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
     return std::make_tuple(error, std::string(buffer));
   }
 
-  void async_send(const std::string& message, bool client,
+  void async_send(const std::string& message,
                   const std::function<void(std::size_t)>& callback = nullptr) {
     if (not message.size())
       throw std::logic_error("[Messenger] attempt to send an empty message.");
 
-    if (message.size() > BUFFER_SIZE)
-      throw std::logic_error("[Messenger] Message size > " +
-                             std::to_string(BUFFER_SIZE) +
-                             ". Please modify define BUFFER_SIZE.");
-
-    char buffer[BUFFER_SIZE] = {0};
-
-    std::strcpy(buffer, message.c_str());
-    socket_.async_send(asio::buffer(buffer, message.size()),
-                       [&](const asio::error_code error, std::size_t bytes) {
+    socket_.async_send(asio::buffer(message.data(), message.size()),
+                       strand_.wrap([&](const asio::error_code error, std::size_t bytes) {
       if (error) throw asio::system_error(error);
 
       if (not bytes) {
@@ -191,18 +180,15 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
       }
 
       if (callback) callback(bytes);
-    });
-
-    if (client) socket_.get_io_service().run_one();
+    }));
   }
 
-  void async_receive(bool client,
-                     const std::function<void(std::string)>& callback) {
+  void async_receive(const std::function<void(std::string)>& callback) {
     char buffer[BUFFER_SIZE] = {0};
 
     socket_.async_receive(
         asio::buffer(buffer, BUFFER_SIZE),
-        [&](const asio::error_code& error, std::size_t bytes) {
+        strand_.wrap([&](const asio::error_code& error, std::size_t bytes) {
 
           if (error) throw asio::system_error(error);
 
@@ -212,17 +198,17 @@ class Stream : public std::enable_shared_from_this<Stream<T>> {
           }
 
           callback(std::string(buffer));
-        });
-    if (client) socket_.get_io_service().run_one();
+        }));
   }
 
  private:
   Stream(asio::io_context& io_service)
-      : socket_(io_service), session_(socket_) {}
+      : socket_(io_service), session_(socket_), strand_(io_service) {}
 
  private:
   T socket_;
   Session<T> session_;
+  asio::io_context::strand strand_;
 };
 
 /**
@@ -247,13 +233,72 @@ class Datagram : public std::enable_shared_from_this<Datagram<T>> {
   T& socket() { return socket_; }
   Session<T>& session() { return session_; }
 
+  void stop() {
+    session_.stop();
+  }
+
+  std::tuple<asio::error_code, std::size_t> send(udp::endpoint target,
+                                                 const std::string& message) {
+    asio::error_code error;
+
+    socket_.send_to(asio::buffer(message.data(), message.size()), target, 0, error);
+    if (error) return std::make_tuple(error, 0);
+    return std::make_tuple(error, message.size());
+  }
+
+  std::tuple<asio::error_code, std::string> receive(udp::endpoint target) {
+    asio::error_code error;
+    char buffer[BUFFER_SIZE] = {0};
+
+    socket_.receive_from(asio::buffer(buffer, BUFFER_SIZE), target, 0, error);
+    if (error) return std::make_tuple(error, "error");
+    return std::make_tuple(error, std::string(buffer));
+  }
+
+  void async_send(udp::endpoint target, const std::string& message,
+                  const std::function<void(std::size_t)>& callback = nullptr) {
+
+    socket_.async_send_to(
+        asio::buffer(message.data(), message.size()), target,
+        [&](const asio::error_code& error, std::size_t bytes) {
+
+          if (error) throw asio::system_error(error);
+          if (not bytes) {
+            throw std::runtime_error(
+                "[Messenger] async_send failed. Unexpected error occurred.");
+          }
+
+          if (callback) callback(bytes);
+        });
+  }
+
+  void async_receive(udp::endpoint target,
+                     const std::function<void(std::string)>& callback) {
+    char buffer[BUFFER_SIZE] = {0};
+
+    socket_.async_receive_from(
+        asio::buffer(buffer, BUFFER_SIZE), target,
+        [&](const asio::error_code& error, std::size_t bytes) {
+
+          if (error) throw asio::system_error(error);
+
+          if (not bytes or std::string(buffer).empty()) {
+            throw std::runtime_error(
+                "[Messenger] Unexpected error occurred. async_receive failed.");
+          }
+
+          callback(std::string(buffer));
+      });
+  }
+
  private:
   Datagram(asio::io_context& io_service)
-      : socket_(io_service), session_(socket_) {}
+      : socket_(io_service), session_(socket_), strand_(io_service) {}
 
  private:
   T socket_;
   Session<T> session_;
+  asio::io_context::strand strand_;
 };
 
 /**
@@ -352,11 +397,11 @@ class Software {
                                     [this](const asio::error_code& error) {
 
       if (error)
-        throw std::runtime_error(" [Messenger] Connection to host: " + host_ +
-                                 " port: " + port_ + " failed.");
+        throw std::runtime_error(" [Messenger] Connection to " + host_ + ":" + port_ + " failed.");
       connected_ = true;
       if (connect_handler_) connect_handler_();
     });
+
     service_.get_io_service().run_one();
     return;
   }
@@ -365,15 +410,15 @@ class Software {
     if (connected_) {
       stream_->stop();
       connected_ = false;
+      service_.get_io_service().stop();
       if (disconnect_handler_) disconnect_handler_();
     }
   }
 
   std::size_t send(const std::string& message) {
     if (not connected_)
-      throw std::logic_error(
-          "[Messenger] Client is not connected. Call 'run' method once "
-          "before.");
+    throw std::logic_error(
+        "[Messenger] Client is not connected. Run the client first.");
 
     auto result = stream_->send(message);
 
@@ -388,8 +433,7 @@ class Software {
   std::string receive() {
     if (not connected_)
       throw std::logic_error(
-          "[Messenger] Client is not connected. Call 'run' method once "
-          "before.");
+          "[Messenger] Client is not connected. Run the client first.");
 
     auto received = stream_->receive();
 
@@ -399,8 +443,7 @@ class Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from: " + host_ +
-                               ":" + port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] error client: 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -409,8 +452,7 @@ class Software {
                   const std::function<void(std::size_t)>& callback = nullptr) {
     if (not connected_)
       throw std::logic_error(
-          "[Messenger] Client is not connected. Call 'run' method once "
-          "before.");
+          "[Messenger] Client is not connected. Run the client first.");
 
     if (not async_) {
       std::cerr << "[Messenger] Error: Synchronous Client cannot perform";
@@ -419,18 +461,18 @@ class Software {
     }
 
     try {
-      stream_->async_send(message, true, callback);
+      stream_->async_send(message, callback);
+      service_.get_io_service().run_one();
     } catch (const std::exception& e) {
-      disconnect();
       std::cerr << e.what() << std::endl;
+      disconnect();
     }
   }
 
   void async_receive(const std::function<void(std::string)>& callback) {
     if (not connected_)
       throw std::logic_error(
-          "[Messenger] Client is not connected. Call 'run' method once "
-          "before.");
+          "[Messenger] Client is not connected. Run the client first.");
 
     if (not async_) {
       std::cerr << "[Messenger] Error: Synchronous Client cannot perform";
@@ -439,10 +481,11 @@ class Software {
     }
 
     try {
-      stream_->async_receive(true, callback);
+      stream_->async_receive(callback);
+      service_.get_io_service().run_one();
     } catch (const std::exception& e) {
-      disconnect();
       std::cerr << e.what() << std::endl;
+      disconnect();
     }
   }
 };
@@ -512,6 +555,7 @@ class TCP_Server : public Software {
   void disconnect() {
     stream_->stop();
     acceptor_.close();
+    io_service_.stop();
     if (disconnect_handler_) disconnect_handler_();
   }
 
@@ -535,8 +579,7 @@ class TCP_Server : public Software {
     }
 
     if (std::get<1>(received) == "ERR-0-BYTES-READ")
-      throw std::runtime_error("[Messenger] Receiving data from port: " +
-                               port_ + " failed. 0 bytes received.");
+      throw std::runtime_error("[Messenger] error server: 0 bytes received.");
 
     return std::get<1>(received);
   }
@@ -550,7 +593,7 @@ class TCP_Server : public Software {
     }
 
     try {
-      stream_->async_send(message, false, callback);
+      stream_->async_send(message, callback);
     } catch (const std::exception& e) {
       disconnect();
       std::cerr << e.what() << std::endl;
@@ -565,7 +608,7 @@ class TCP_Server : public Software {
     }
 
     try {
-      stream_->async_receive(false, callback);
+      stream_->async_receive(callback);
     } catch (const std::exception& e) {
       disconnect();
       std::cerr << e.what() << std::endl;
@@ -623,7 +666,7 @@ class UDP_Client : public Software {
       : async_(async),
         host_(host),
         port_(port),
-        io_service_(io_service),
+        service_(io_service),
         datagram_(Datagram<udp::socket>::create(io_service)) {
     set_connection_handler(nullptr);
     set_disconnection_handler(nullptr);
@@ -641,22 +684,61 @@ class UDP_Client : public Software {
   std::string host_;
   std::string port_;
   udp::endpoint endpoint_;
-  asio::io_context::work io_service_;
+  asio::io_context::work service_;
   Datagram<udp::socket>::instance datagram_;
 
  public:
-  void run() {}
+  void run() {
+    udp::resolver resolver(service_.get_io_service());
+    udp::resolver::query query(udp::v4(), host_, port_);
 
-  void disconnect() {}
+    endpoint_ = *resolver.resolve(query);
+    datagram_->socket().open(endpoint_.protocol());
+  }
 
-  std::size_t send(const std::string& message) { return 4; }
+  void disconnect() {
+    datagram_->stop();
+  }
 
-  std::string receive() { return std::string(""); }
+  std::size_t send(const std::string& message) {
+
+    auto result = datagram_->send(endpoint_, message);
+
+    if (std::get<0>(result)) {
+      disconnect();
+      throw asio::system_error(std::get<0>(result));
+    }
+
+    return std::get<1>(result);
+  }
+
+  std::string receive() {
+
+    auto response = datagram_->receive(endpoint_);
+
+    if (std::get<0>(response)) {
+      disconnect();
+      throw asio::system_error(std::get<0>(response));
+    }
+
+    return std::get<1>(response);
+  }
 
   void async_send(const std::string& message,
-                  const std::function<void(std::size_t)>& callback = nullptr) {}
+                  const std::function<void(std::size_t)>& callback = nullptr) {
 
-  void async_receive(const std::function<void(std::string)>& callback) {}
+     if (not async_) {
+       std::cerr << "[Messenger] Error: Synchronous client cannot perform";
+       std::cerr << " asynchronous operations" << std::endl;
+     }
+  }
+
+  void async_receive(const std::function<void(std::string)>& callback) {
+    if (not async_) {
+      std::cerr << "[Messenger] Error: Synchronous client cannot perform";
+      std::cerr << " asynchronous operations" << std::endl;
+    }
+  }
 };
 
 /**
@@ -690,17 +772,47 @@ class UDP_Server : public Software {
   bool async_;
   std::string port_;
   udp::endpoint endpoint_;
+  udp::endpoint s_endpoint_;
   asio::io_context io_service_;
   Datagram<udp::socket>::instance datagram_;
 
  public:
-  void run() {}
+  void run() {
+    udp::resolver resolver(io_service_);
+    udp::resolver::query query(udp::v4(), port_);
 
-  void disconnect() {}
+    endpoint_ = udp::endpoint(udp::v4(), std::stoi(port_));
+    datagram_->socket().open(endpoint_.protocol());
+    // datagram_->socket().open(udp::v4());
+  }
 
-  std::size_t send(const std::string& message) { return 4; }
+  void disconnect() {
+    datagram_->stop();
+  }
 
-  std::string receive() { return std::string(""); }
+  std::size_t send(const std::string& message) {
+
+    auto result = datagram_->send(endpoint_, message);
+
+    if (std::get<0>(result)) {
+      disconnect();
+      throw asio::system_error(std::get<0>(result));
+    }
+
+    return std::get<1>(result);
+  }
+
+  std::string receive() {
+
+    auto response = datagram_->receive(endpoint_);
+
+    if (std::get<0>(response)) {
+      disconnect();
+      throw asio::system_error(std::get<0>(response));
+    }
+
+    return std::get<1>(response);
+  }
 
   void async_send(const std::string& message,
                   const std::function<void(std::size_t)>& callback = nullptr) {}
