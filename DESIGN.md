@@ -94,27 +94,21 @@ Note: JSON is not handled by default, because all famous library has a to_string
   auto tcp_client = new Messenger("client", "tcp", false, "5050");
 
 
-  auto co = [](){
-    std::cout << "connected :)" << std::endl;
-  };
+  // If you want your client to perform operations at the connection
+  // you have to define the connection handler before run your client
+  tcp_client->set_connection_handler([&](){
+      // Do some stuff
+      // for example you could send or receive a message, here.
+  });
 
 
   // Connect client
   tcp_client->run();
 
-  // Execute a handler at the connection of the client
-  tcp_client->set_connection_handler(co); // you have to set the handler before call run.
-  tcp_client->run();
+  // send/receive operations
+  auto bytes = tcp_client->send("message");
+  auto response = tcp_client->receive();
 
-
-  // If you want your client to perform an operation at the connection
-  // you could do something like this
-  tcp_client->set_connection_handler([&](){
-      tcp_client->send("message");
-      auto message = tcp_client->receive();
-  });
-
-  tcp_client->run();
 
   // Following the same idea you have the possibility to set a disconnection handler.
   // It works like the connection handler and you also have to set it before call
@@ -122,15 +116,12 @@ Note: JSON is not handled by default, because all famous library has a to_string
   // NOTE: In case of error, the disconnect method is called before throwing the error
   //       so the handler too if you had set one.
 
-  // send/receive operations
-  auto bytes = tcp_client->send("message");
-  auto response = tcp_client->receive();
-
-  std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
-  std::cout << "message received by tcp: " << response << std::endl;
 ```
 
+
 - Exemple 2: TCP Server
+
+
 
 ```c++
   #include "Hermes.hpp"
@@ -143,40 +134,27 @@ Note: JSON is not handled by default, because all famous library has a to_string
   auto tcp_server = new Messenger("server", "tcp", false, "5050");
 
 
-  auto co = [](){
-    std::cout << "got connection :)" << std::endl;
-  };
-
+  // If you want your server to perform operations when he has a connection
+  tcp_server->set_connection_handler([&](){
+        // Do some stuff
+    });
 
   // Start server
   tcp_server->run();
 
-  // Execute a handler when you have a connection
-  tcp_server->set_connection_handler(co); // you have to set the handler before call run.
-  tcp_server->run();
+  // send/receive operations
+  auto bytes = tcp_server->send("message");
+  auto response = tcp_server->receive();
 
 
-  // If you want your server to perform an operation when he has a connection
-  // you could do something like this
-  tcp_server->set_connection_handler([&](){
-      tcp_server->send("message");
-      auto message = tcp_server->receive();
-    });
-
-  tcp_server->run();
+  // /!\ This is an iterative server, which means that it will handle
+  // /!\ one connection at a time
 
   // Following the same idea you have the possibility to set a disconnection handler.
   // It works like the connection handler and you also have to set it before call
   // the disconnection of your client.
   // NOTE: In case of error, the disconnect method is called before throwing the error
   //       so the handler too if you had set one.
-
-  // send/receive operations
-  auto bytes = tcp_server->send("message");
-  auto response = tcp_server->receive();
-
-  std::cout << "number of bytes sent by tcp: " << bytes << std::endl;
-  std::cout << "message received by tcp: " << response << std::endl;
 
 ```
 
@@ -257,12 +235,17 @@ One more thing, as you should know, using protobuf involves to having defined a 
     std::cout << "Message sent :)" << std::endl;
 
 
+  // 'receive' functions returns a T object
+  // with T the type of your protobuf message
   auto response = protobuf::receive<package::message>("8080");
 
-  // Do stuff with response
   auto descriptor = response.GetDescriptor();
 ```
+
+
 - Example 2: Asynchronous send/receive operations.
+
+
 
 ```c++
   #include "Hermes.hpp"
@@ -288,7 +271,7 @@ One more thing, as you should know, using protobuf involves to having defined a 
   });
 
 
-
+  // Asynchronous receive
   protobuf::async_receive<package::message>("8080", [](com::Message response) {
 
       // do some stuff

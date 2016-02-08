@@ -53,7 +53,7 @@ include_directories(libs/asio/asio/include)
 
 
 add_executable(test_hermes pb/Communication.pb.cc
-                           tests/main.cpp)
+                           tests/debug.cpp)
 
 target_link_libraries(test_hermes ${Boost_FILESYSTEM_LIBRARY}
                                    ${Boost_SYSTEM_LIBRARY}
