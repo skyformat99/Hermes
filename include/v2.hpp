@@ -1,7 +1,11 @@
 #pragma once
 
+#include <thread>
 #include <string>
+#include <memory>
 #include <iostream>
+#include <stdexcept>
+#include <functional>
 
 #include "asio.hpp"
 #include "google/protobuf/message.h"
@@ -50,15 +54,49 @@ namespace core {
 */
 class Service {
  public:
-  Service() : work_(io_service_) {}
+  // Ctor
+  Service() : work_(new asio::io_context::work(io_service_)) {}
 
-  ~Service() {}
+  // MoveCtor
+  Service(Service&&) = delete;
+  // CopyCtor
+  Service(const Service&) = delete;
+  // Assignment operator
+  Service& operator=(Service&&) = delete;
+  // Move assignment operator
+  Service& operator=(const Service&) = delete;
+
+
+  // Dtor
+  ~Service() {
+    if (thread_.joinable()) {
+      io_service_.stop();
+      thread_.join();
+    }
+  }
+
+  void run() {
+    if (not thread_.joinable())
+      thread_ = std::thread([this]() { io_service_.run(); });
+  }
+
+  void post(const std::function<void()>& handler) { io_service_.post(handler); }
+
+  asio::io_context& get() { return io_service_; }
+
+  std::shared_ptr<asio::io_context::work>& get_work() { return work_; }
 
  private:
-  // I/O services
+  // Dedicated thread to call the run() method.
+  std::thread thread_;
+
+  // I/O services.
   asio::io_context io_service_;
-  // keep I/O services alive until there is no unfinished operations remaining
-  asio::io_context::work work_;
+
+  // The work_ variable keeps I/O services alive until there is no unfinished
+  // operations remaining. Service owns a smart pointer on the work class to be
+  // able to reset it in order to gracefully finish all pending operations.
+  std::shared_ptr<asio::io_context::work> work_;
 };
 
 /**
