@@ -1,8 +1,11 @@
 #pragma once
 
-#include <thread>
-#include <string>
+#include <mutex>
+#include <chrono>
 #include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 #include <iostream>
 #include <stdexcept>
 #include <functional>
@@ -55,17 +58,13 @@ namespace core {
 class Service {
  public:
   // Ctor
-  Service() : work_(new asio::io_context::work(io_service_)) {}
+  Service()
+      : strand_(io_service_), work_(new asio::io_context::work(io_service_)) {}
 
-  // MoveCtor
-  Service(Service&&) = delete;
   // CopyCtor
   Service(const Service&) = delete;
-  // Assignment operator
-  Service& operator=(Service&&) = delete;
   // Move assignment operator
   Service& operator=(const Service&) = delete;
-
 
   // Dtor
   ~Service() {
@@ -77,7 +76,16 @@ class Service {
 
   void run() {
     if (not thread_.joinable())
-      thread_ = std::thread([this]() { io_service_.run(); });
+      thread_ = std::thread([this]() {
+        asio::error_code error;
+
+        try {
+          io_service_.run(error);
+          if (error) throw asio::system_error(error);
+        } catch (std::exception& e) {
+          throw std::runtime_error(e.what());
+        }
+      });
   }
 
   void post(const std::function<void()>& handler) { io_service_.post(handler); }
@@ -92,6 +100,11 @@ class Service {
 
   // I/O services.
   asio::io_context io_service_;
+
+  // Asio strand class provides a serialized handler execution, it means that
+  // strand class ensures that handlers will be executed according
+  // the order wherein they have been queued.
+  asio::io_context::strand strand_;
 
   // The work_ variable keeps I/O services alive until there is no unfinished
   // operations remaining. Service owns a smart pointer on the work class to be
