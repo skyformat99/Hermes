@@ -76,21 +76,14 @@ class Service {
 
   void run() {
     if (not thread_.joinable())
-      thread_ = std::thread([this]() {
-        asio::error_code error;
-
-        try {
-          io_service_.run(error);
-          if (error) throw asio::system_error(error);
-        } catch (std::exception& e) {
-          throw std::runtime_error(e.what());
-        }
-      });
+      thread_ = std::thread([this]() { io_service_.run(); });
   }
 
   void post(const std::function<void()>& handler) { io_service_.post(handler); }
 
   asio::io_context& get() { return io_service_; }
+
+  asio::io_context::strand& get_strand() { return strand_; }
 
   std::shared_ptr<asio::io_context::work>& get_work() { return work_; }
 
@@ -113,13 +106,21 @@ class Service {
 };
 
 /**
+*  @brief: Errors handling class
 *
+*  @description: Error class is a tool to get the code more readable. It owns an
+*  asio::error_code variable to deal with error happening with asio object and gives
+*  an access to  many class constructors to handle different kind of error.
 *
-*
-*
-*
-*
-*
+*  @content:
+*     > class User : public std::logic_error
+*       handle errors made by Hermes' user
+*     > class Connection : public std::runtime_error
+*       handle errors relatives to connect operations.
+*     > class Write : public ::std::runtime_error
+*       handle errors relatives to writting operations.
+*     > class Read : public ::std::runtime_error
+*       handle errors relatives to reading operations.
 *
 */
 class Error {
@@ -128,7 +129,68 @@ class Error {
 
   asio::error_code& get() { return error_; }
 
-  // asio's error class
+  static void throw_asio_error(asio::error_code& error) {
+    throw asio::system_error(error);
+  }
+
+  // logic errors handler
+  class User : public std::logic_error {
+   public:
+    User(const std::string& error = "error")
+        : logic_error("logic error"), message_(error) {}
+
+    virtual ~User() throw() {}
+
+    virtual const char* what() const throw() { return message_.c_str(); }
+
+   private:
+    std::string message_;
+  };
+
+  // runtime errors handler about connect operations
+  class Connection : public std::runtime_error {
+   public:
+    Connection(const std::string& error = "error")
+        : runtime_error("Connect operation"), message_(error) {}
+
+    virtual ~Connection() throw() {}
+
+    virtual const char* what() const throw() { return message_.c_str(); }
+
+   private:
+    std::string message_;
+  };
+
+  // runtime errors handler about writting operations
+  class Write : public std::runtime_error {
+   public:
+    Write(const std::string& error = "error")
+        : runtime_error("Write operation"), message_(error) {}
+
+    virtual ~Write() throw() {}
+
+    virtual const char* what() const throw() { return message_.c_str(); }
+
+   private:
+    std::string message_;
+  };
+
+  // runtime errors handler about reading operations
+  class Read : public std::runtime_error {
+   public:
+    Read(const std::string& error = "error")
+        : runtime_error("Read operation"), message_(error) {}
+
+    virtual ~Read() throw() {}
+
+    virtual const char* what() const throw() { return message_.c_str(); }
+
+   private:
+    std::string message_;
+  };
+
+ private:
+  // Asio error
   asio::error_code error_;
 };
 

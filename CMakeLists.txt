@@ -55,6 +55,13 @@ include_directories(libs/asio/asio/include)
 add_executable(test_hermes pb/Communication.pb.cc
                            tests/debug.cpp)
 
+add_executable(debug pb/Communication.pb.cc
+                              tests/main_debug.cpp)
+
 target_link_libraries(test_hermes ${Boost_FILESYSTEM_LIBRARY}
                                    ${Boost_SYSTEM_LIBRARY}
                                    ${PROTOBUF_LIBRARY})
+
+target_link_libraries(debug ${Boost_FILESYSTEM_LIBRARY}
+                                  ${Boost_SYSTEM_LIBRARY}
+                                  ${PROTOBUF_LIBRARY})
