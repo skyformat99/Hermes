@@ -12,5 +12,10 @@ int main() {
 
   test(service.get_strand());
 
+  std::unique_ptr<int> toto;
+
+  toto = std::unique_ptr<int>(new int(4));
+
+  std::cout << *toto  << std::endl;
   return 0;
 }

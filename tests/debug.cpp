@@ -88,7 +88,8 @@ SCENARIO("Dedicated class for Error handling", "[core]") {
 
     auto user = []() { throw Error::User("logic error"); };
 
-    auto connection = []() { throw Error::Connection("connect operation failed"); };
+    auto connection =
+        []() { throw Error::Connection("connect operation failed"); };
 
     auto write = []() { throw Error::Write("write operation failed"); };
 

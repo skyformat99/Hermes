@@ -85,7 +85,7 @@ class Service {
 
   asio::io_context::strand& get_strand() { return strand_; }
 
-  std::shared_ptr<asio::io_context::work>& get_work() { return work_; }
+  std::unique_ptr<asio::io_context::work>& get_work() { return work_; }
 
  private:
   // Dedicated thread to call the run() method.
@@ -102,14 +102,15 @@ class Service {
   // The work_ variable keeps I/O services alive until there is no unfinished
   // operations remaining. Service owns a smart pointer on the work class to be
   // able to reset it in order to gracefully finish all pending operations.
-  std::shared_ptr<asio::io_context::work> work_;
+  std::unique_ptr<asio::io_context::work> work_;
 };
 
 /**
 *  @brief: Errors handling class
 *
 *  @description: Error class is a tool to get the code more readable. It owns an
-*  asio::error_code variable to deal with error happening with asio object and gives
+*  asio::error_code variable to deal with error happening with asio object and
+*gives
 *  an access to  many class constructors to handle different kind of error.
 *
 *  @content:
@@ -136,7 +137,9 @@ class Error {
   // logic errors handler
   class User : public std::logic_error {
    public:
-    User(const std::string& error = "error")
+    // ctor as explicit prevents the compiler from using it for implicit
+    // conversion
+    explicit User(const std::string& error = "error")
         : logic_error("logic error"), message_(error) {}
 
     virtual ~User() throw() {}
@@ -150,7 +153,9 @@ class Error {
   // runtime errors handler about connect operations
   class Connection : public std::runtime_error {
    public:
-    Connection(const std::string& error = "error")
+    // ctor as explicit prevents the compiler from using it for implicit
+    // conversion
+    explicit Connection(const std::string& error = "error")
         : runtime_error("Connect operation"), message_(error) {}
 
     virtual ~Connection() throw() {}
@@ -164,7 +169,9 @@ class Error {
   // runtime errors handler about writting operations
   class Write : public std::runtime_error {
    public:
-    Write(const std::string& error = "error")
+    // ctor as explicit prevents the compiler from using it for implicit
+    // conversion
+    explicit Write(const std::string& error = "error")
         : runtime_error("Write operation"), message_(error) {}
 
     virtual ~Write() throw() {}
@@ -178,7 +185,9 @@ class Error {
   // runtime errors handler about reading operations
   class Read : public std::runtime_error {
    public:
-    Read(const std::string& error = "error")
+    // ctor as explicit prevents the compiler from using it for implicit
+    // conversion
+    explicit Read(const std::string& error = "error")
         : runtime_error("Read operation"), message_(error) {}
 
     virtual ~Read() throw() {}
