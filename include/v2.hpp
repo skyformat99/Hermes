@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mutex>
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <functional>
+#include <condition_variable>
 
 #include "asio.hpp"
 #include "google/protobuf/message.h"
@@ -26,6 +28,10 @@ namespace hermes {
 */
 namespace core {
 
+  // Size used for buffers to receive response.
+  // Modify the value if you need a bigger size.
+  static unsigned int const BUFFER_SIZE = 2048;
+
 /**
 *  @brief: Your program's link to your operating system I/O services.
 *
@@ -34,9 +40,10 @@ namespace core {
 *  such as a socket. The io_context is the glue between your I/O object and the
 *  operating system I/O services.
 *  The future requests (operations) of your I/O object will be forwarded to the
-*  io_context. io_context will call your operating system to perform the wanted
-*  operation and will translate the result of the performed operation into an
-*  asio error_code, then it will be forwarded back up to your I/O object.
+*  io_context.The io_context will call your operating system to perform the
+*  wanted operation and will translate the result of the performed operation
+*  into an asio error_code, then it will be forwarded back up to your I/O
+*  object.
 *
 *  @link:
 *   http://think-async.com/Asio/asio-1.11.0/doc/asio/overview/core/basics.html
@@ -46,7 +53,9 @@ namespace core {
 *  cover all use cases that a user could encouter performing I/O operations.
 *  To ensure thread safety, Service owns a distinct object asio::io_context.
 *  Furthermore, to guarantee that the io_context will not exit while operations
-*  are running, an asio::io_context::work is implemented.
+*  are running, an asio::io_context::work is implemented as well as a strand
+*  object to serialize the execution of handlers and execute them in the
+*  according order in wich they have been enqueued.
 *
 *  @link:
 *   http://think-async.com/Asio/asio-1.11.0/doc/asio/reference/io_service__work.html
@@ -59,7 +68,9 @@ class Service {
  public:
   // Ctor
   Service()
-      : strand_(io_service_), work_(new asio::io_context::work(io_service_)) {}
+      : strand_(io_service_),
+        stop_(false),
+        work_(new asio::io_context::work(io_service_)) {}
 
   // CopyCtor
   Service(const Service&) = delete;
@@ -74,29 +85,56 @@ class Service {
     }
   }
 
+  // runs the service in his dedicated thread.
   void run() {
-    if (not thread_.joinable())
-      thread_ = std::thread([this]() { io_service_.run(); });
+    if (not stop_)
+      if (not thread_.joinable())
+        thread_ = std::thread([this]() { io_service_.run(); });
   }
 
-  void post(const std::function<void()>& handler) { io_service_.post(handler); }
+  // asks the I/O service to execute the given handler.
+  void post(const std::function<void()>& handler) {
+    if (not stop_) io_service_.post(handler);
+  }
 
+  // stops the service.
+  void stop() {
+    if (not stop_) {
+      stop_ = true;
+      work_.reset();
+      io_service_.run();
+      io_service_.stop();
+    }
+  }
+
+  // returns the state of the service.
+  bool is_stop() { return stop_; }
+
+  // returns a reference on the I/O service.
   asio::io_context& get() { return io_service_; }
 
+  // returns a reference on the dedicated thread used to run the service.
+  std::thread& get_thread() { return thread_; }
+
+  // returns a reference on the strand object.
   asio::io_context::strand& get_strand() { return strand_; }
 
+  // returns a reference on the smart pointer managing the work obect.
   std::unique_ptr<asio::io_context::work>& get_work() { return work_; }
 
  private:
   // Dedicated thread to call the run() method.
   std::thread thread_;
 
+  // Indicates if the service is stopped.
+  std::atomic<bool> stop_;
+
   // I/O services.
   asio::io_context io_service_;
 
   // Asio strand class provides a serialized handler execution, it means that
   // strand class ensures that handlers will be executed according
-  // the order wherein they have been queued.
+  // the order wherein they have been enqueued.
   asio::io_context::strand strand_;
 
   // The work_ variable keeps I/O services alive until there is no unfinished
@@ -108,10 +146,10 @@ class Service {
 /**
 *  @brief: Errors handling class
 *
-*  @description: Error class is a tool to get the code more readable. It owns an
-*  asio::error_code variable to deal with error happening with asio object and
-*gives
-*  an access to  many class constructors to handle different kind of error.
+*  @description: Error class is a tool to get the code more readable. It owns
+*  an asio::error_code variable to deal with error happening with asio objects
+*  and gives an access to  many class constructors to handle different
+*  kind of error.
 *
 *  @content:
 *     > class User : public std::logic_error
@@ -204,5 +242,160 @@ class Error {
 };
 
 }  // namespace core
+
+/**
+*  @brief: Hermes network functionalities
+*
+*  @description: The namespace network contains usefull tools to perform network
+*  operations. In order to provide to the user, a library supporting both
+*  TCP/UDP protocol, a tcp and udp sockets have been wrapped respectively in
+*  a Stream and a Datagram class.
+*  Stream and Datagram have been designed to serialize operations on I/O object
+*  according their protocol.
+*  Both of those wrappers need a Service object to be able to to call the I/O
+*  services of your operating system.
+*
+*  @require: Hermes::core
+*
+*/
+namespace network {
+
+/**
+*   @brief: an asio::tcp::ip::socket wrapper to manage and serialize operations
+*   on the socket.
+*
+*   @description: Stream provides a TCP "session", by this i mean, it offers a
+*   dedicated object wich owns a tcp socket and represent a new tcp connection.
+*   Stream is a serialized way to handle TCP operations on a I/O object.
+*   Thinking asynchronously, Stream needs a reference on a Service to be
+*   constructed. Stream will rest on the given service to perform the future
+*   asynchronous operations made by the user.
+*   shared_ptr and enable_shared_from_this are used to keep the Stream object
+*   alive as long as there is an operation that refers to it.
+*
+*/
+class Stream : public std::enable_shared_from_this<Stream> {
+ public:
+  typedef std::shared_ptr<Stream> session;
+
+  // Creates a new TCP session.
+  static session new_session(core::Service& service) {
+    return session(new Stream(service));
+  }
+
+  // synchronous connection to the given endpoint.
+  // @param: a valid endpoint.
+  void connect(const asio::ip::tcp::endpoint& endpoint) {
+    core::Error error;
+
+    socket_.connect(endpoint, error.get());
+    if (error.get()) core::Error::throw_asio_error(error.get());
+    connected_ = true;
+  }
+
+  // Stops the stream.
+  // @Note: does not stop the service.
+  void disconnect() {
+    if (not connected_) return;
+
+    connected_ = false;
+
+    // To prevent some concurrency issues, the shutdown and close calls
+    // are locked, waiting to be notified that one thread has completed the
+    // tasks.
+    // First thread to come up here, changes the boolean to false and runs the
+    // function object to close/shutdown the socket and he notifies that the job
+    // is completed. Once that is done, next thread to come up here will have
+    // the boolean connected_ set with false as value and the function will
+    // return immediately.
+    std::mutex mutex;
+    std::condition_variable condvar;
+    std::unique_lock<std::mutex> lock(mutex);
+
+    std::atomic_bool notified(false);
+    service_.get_strand().post([this, &condvar, &notified]() {
+      core::Error error;
+      // asio error_code provided to ensure that no exception will be thrown.
+      socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
+      socket_.close();
+      notified = true;
+      condvar.notify_one();
+    });
+    if (not notified) condvar.wait(lock);
+  }
+
+  // Synchronous send of amount of data.
+  // @param: the message to send.
+  std::size_t send(const std::string& message) {
+    core::Error error;
+    std::mutex mutex;
+
+    std::lock_guard<std::mutex> lock(mutex);
+    auto bytes = asio::write(
+        socket_, asio::buffer(message.data(), message.size()), error.get());
+
+    if (error.get()) core::Error::throw_asio_error(error.get());
+
+    if (bytes != message.size())
+      throw core::Error::Write(
+          "Unexpected error occurred: asio::write failed. All data have not "
+          "been sent.");
+    return bytes;
+  }
+
+  // Synchronous receive data.
+  // The size of the data is defined by core::BUFFER_SIZE.
+  // Each message including his size > core::BUFFER_SIZE will be imcompleted.
+  std::string receive() {
+    core::Error error;
+    std::mutex mutex;
+    char buffer[core::BUFFER_SIZE] = {0};
+
+    std::lock_guard<std::mutex> lock(mutex);
+    socket_.read_some(
+      asio::buffer(buffer, core::BUFFER_SIZE), error.get()
+    );
+
+    if (error.get()) core::Error::throw_asio_error(error.get());
+
+    if (not std::string(buffer).size())
+      throw core::Error::Read(
+        "Unexpected error occurred. asio::ip::tpc::socket::read_some failed. "
+        "0 bytes received."
+      );
+    return std::string(buffer);
+  }
+
+  // returns if the stream is connected.
+  bool is_connected() { return connected_; }
+
+  // returns the reference on the service used by the session.
+  core::Service& service() { return service_; }
+
+  // returns a reference on the socket used by the session.
+  asio::ip::tcp::socket& socket() { return socket_; }
+
+ private:
+  // ctor
+  Stream(core::Service& service)
+      : service_(service), connected_(false), socket_(service.get()) {}
+
+  // A reference on the service to perform I/O operations.
+  core::Service& service_;
+
+  // Thread safe boolean to know if the stream is connected.
+  std::atomic<bool> connected_;
+
+  // TCP socket.
+  asio::ip::tcp::socket socket_;
+
+  // Buffer for the incoming response.
+  std::vector<char> read_buffer_;
+
+  // Buffer for the message to send.
+  std::vector<char> write_buffer_;
+};
+
+}  // namespace network
 
 }  // namespace hermes

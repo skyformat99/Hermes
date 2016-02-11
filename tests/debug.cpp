@@ -5,6 +5,7 @@
 #include "Communication.pb.h"
 
 using namespace hermes::core;
+using namespace hermes::network;
 
 SCENARIO("I/O Services", "[core]") {
   GIVEN("Service object, routine function, f function to print parameter") {
@@ -28,14 +29,14 @@ SCENARIO("I/O Services", "[core]") {
 
     WHEN(
         "Running the service in a dedicated thread without adding a work."
-        ">>> should not be stuck") {
+        "\n>>> should not be stuck") {
       service.run();
       REQUIRE(test);
     }
 
     WHEN(
         "Reset work object to run the service in our main thread."
-        ">>> should not be stuck") {
+        "\n>>> should not be stuck") {
       test = false;
       service.get_work().reset();
       service.get().run();
@@ -44,7 +45,7 @@ SCENARIO("I/O Services", "[core]") {
 
     WHEN(
         "Testing post() method using a thread pool."
-        ">>> no error should be thrown") {
+        "\n>>> no error should be thrown") {
       std::vector<std::thread> threads;
 
       for (int i = 0; i < 2; ++i) {
@@ -63,7 +64,7 @@ SCENARIO("I/O Services", "[core]") {
 
     WHEN(
         "Testing strand object."
-        ">>> no error should be thrown") {
+        "\n>>> no error should be thrown") {
       std::vector<std::thread> threads;
 
       for (int i = 0; i < 2; ++i) {
@@ -78,6 +79,12 @@ SCENARIO("I/O Services", "[core]") {
 
       service.get_work().reset();
       for (int i = 0; i < 2; i++) REQUIRE_NOTHROW(threads[i].join());
+    }
+
+    WHEN("testing stop() service") {
+      REQUIRE(not service.is_stop());
+      service.stop();
+      REQUIRE(service.is_stop());
     }
   }
 }
@@ -126,5 +133,160 @@ SCENARIO("Dedicated class for Error handling", "[core]") {
         REQUIRE(std::string(e.what()) == "Read operation failed");
       }
     }
+  }
+}
+
+SCENARIO("Stream session", "[network]") {
+  GIVEN("I/O service object") {
+    Service service;
+
+    WHEN(
+        "creating a new stream session."
+        "\n>>> should not be stuck") {
+      auto session = Stream::new_session(service);
+
+      session->service().get_work().reset();
+      session->service().get().run();
+      REQUIRE(session);
+      REQUIRE(not session->service().is_stop());
+      REQUIRE(not session->socket().is_open());
+    }
+
+    WHEN(
+        "adding a work to the session."
+        "\n>>> should print [thread_id_in_wich_run_service_has_been_called] :)") {
+      auto session = Stream::new_session(service);
+
+      auto fct = [](const std::string& debug) {
+        std::cout << "[" << std::this_thread::get_id() << "] " << debug << "\n";
+        REQUIRE(debug == ":)");
+      };
+
+      session->service().run();
+      session->service().get_strand().post(std::bind(fct, ":)"));
+      session->service().get_work().reset();
+      if (session->service().get_thread().joinable())
+        session->service().get_thread().join();
+    }
+
+    WHEN(
+        "connecting tcp socket on local to throw an error "
+        "\nthen to google to success. Disconnecting the session at the end.") {
+      auto session = Stream::new_session(service);
+
+      asio::ip::tcp::resolver resolver(service.get());
+
+      // No server listenning on the specified port.
+      // connection to endpoint2 has to throw.
+      asio::ip::tcp::resolver::query query2("127.0.0.1", "8888");
+      asio::ip::tcp::endpoint endpoint2 = *resolver.resolve(query2);
+      REQUIRE_THROWS(session->connect(endpoint2));
+
+      asio::ip::tcp::resolver::query query("www.google.com", "80");
+      asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+      REQUIRE_NOTHROW(session->connect(endpoint));
+
+      auto disconnected = false;
+
+      session->service().run();
+      session->disconnect();
+      disconnected = true;
+      session->service().get_work().reset();
+      if (session->service().get_thread().joinable())
+        session->service().get_thread().join();
+      REQUIRE(disconnected);
+    }
+
+    WHEN(
+        "Passing a reference on the stream to many threads to call disconnect()"
+        "\nTesting Thread Safety.") {
+      auto session = Stream::new_session(service);
+
+      auto fct = [](Stream::session& session) { session->disconnect(); };
+
+      asio::ip::tcp::resolver resolver(service.get());
+
+      asio::ip::tcp::resolver::query query("www.google.com", "80");
+      asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+      REQUIRE_NOTHROW(session->connect(endpoint));
+
+      session->service().run();
+
+      std::vector<std::thread> threads;
+      for (int i = 0; i < 100; i++)
+        threads.push_back(std::thread(std::bind(fct, session)));
+
+      for (int i = 0; i < 100; i++) threads[i].join();
+
+      session->service().get_work().reset();
+      if (session->service().get_thread().joinable())
+        session->service().get_thread().join();
+      REQUIRE(not session->is_connected());
+    }
+
+    // testing with netcat
+    // the two followings functions are commented to avoid the failure
+    // of running tests on travis as there is no server listenning on port 9999
+
+    // WHEN("sending tcp message to netcat on port 9999.") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   auto run_session = [&](){
+    //     session->service().run();
+    //   };
+    //
+    //   auto stop_session = [&]() {
+    //     session->disconnect();
+    //     session->service().get_work().reset();
+    //     if (session->service().get_thread().joinable())
+    //       session->service().get_thread().join();
+    //   };
+    //
+    //   run_session();
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //   REQUIRE_NOTHROW(session->connect(endpoint));
+    //   session->send("test :)");
+    //   auto response = session->receive();
+    //   std::cout << response << std::endl;
+    //   stop_session();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("sending tcp message to netcat on port 9999 from 100 threads.") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   auto fct = [](Stream::session& session) {
+    //     auto bytes = session->send(":)");
+    //     REQUIRE(bytes == 2);
+    //     auto response = session->receive();
+    //     {
+    //       std::mutex mutex;
+    //       std::lock_guard<std::mutex> lock(mutex);
+    //       std::cout << response << std::endl;
+    //     }
+    //   };
+    //
+    //   session->service().run();
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //   REQUIRE_NOTHROW(session->connect(endpoint));
+    //
+    //   std::vector<std::thread> threads;
+    //   for (int i = 0; i < 100; i++)
+    //     threads.push_back(std::thread(std::bind(fct, session)));
+    //
+    //   for (int i = 0; i < 100; i++) threads[i].join();
+    //
+    //   session->disconnect();
+    //   session->service().get_work().reset();
+    //   if (session->service().get_thread().joinable())
+    //     session->service().get_thread().join();
+    //   REQUIRE(not session->is_connected());
+    // }
   }
 }
