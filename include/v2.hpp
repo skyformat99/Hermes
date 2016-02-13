@@ -28,9 +28,9 @@ namespace hermes {
 */
 namespace core {
 
-  // Size used for buffers to receive response.
-  // Modify the value if you need a bigger size.
-  static unsigned int const BUFFER_SIZE = 2048;
+// Size used for buffers to receive response.
+// Modify the value if you need a bigger size.
+static unsigned int const BUFFER_SIZE = 2048;
 
 /**
 *  @brief: Your program's link to your operating system I/O services.
@@ -74,15 +74,13 @@ class Service {
 
   // CopyCtor
   Service(const Service&) = delete;
-  // Move assignment operator
+  // Assignment operator
   Service& operator=(const Service&) = delete;
 
   // Dtor
   ~Service() {
-    if (thread_.joinable()) {
-      io_service_.stop();
-      thread_.join();
-    }
+    io_service_.stop();
+    if (thread_.joinable()) thread_.join();
   }
 
   // runs the service in his dedicated thread.
@@ -102,8 +100,12 @@ class Service {
     if (not stop_) {
       stop_ = true;
       work_.reset();
-      io_service_.run();
-      io_service_.stop();
+      if (thread_.joinable())
+        thread_.join();
+      else {
+        io_service_.run();
+        io_service_.stop();
+      }
     }
   }
 
@@ -112,9 +114,6 @@ class Service {
 
   // returns a reference on the I/O service.
   asio::io_context& get() { return io_service_; }
-
-  // returns a reference on the dedicated thread used to run the service.
-  std::thread& get_thread() { return thread_; }
 
   // returns a reference on the strand object.
   asio::io_context::strand& get_strand() { return strand_; }
@@ -167,6 +166,8 @@ class Error {
   Error() {}
 
   asio::error_code& get() { return error_; }
+
+  static void print(const std::string& msg) { std::cerr << msg << std::endl; }
 
   static void throw_asio_error(asio::error_code& error) {
     throw asio::system_error(error);
@@ -293,6 +294,49 @@ class Stream : public std::enable_shared_from_this<Stream> {
     connected_ = true;
   }
 
+  // asynchronous connection to the given endpoint
+  // a callback can be provided, it will be executed once the connection
+  // established.
+  //
+  // @param:
+  //    - endpoint
+  //    - a reference on a std::function returning void and taking a reference
+  //      on the stream as parameter
+  //
+  // @code: c++
+  //  Service service;
+  //  Stream::session = Stream::new_session(service);
+  //  asio::ip::tcp::endpoint; // get an endpoint by resolving host:port
+  //                           // cf: asio documentation.
+  //
+  //  session->async_connect(endpoint, [](Stream& stream){
+  //     // Do some stuff
+  //  });
+  //
+  // @endcode
+  void async_connect(const asio::ip::tcp::endpoint& endpoint,
+                     const std::function<void(Stream&)>& callback = nullptr) {
+    if (connected_) return;
+
+    std::condition_variable condvar;
+    std::atomic_bool notified(false);
+
+    socket_.async_connect(endpoint, [&](const asio::error_code& error) {
+
+      if (error) throw asio::system_error(error);
+      connected_ = true;
+      if (callback) callback(*this);
+      notified = true;
+      // notify that the connection has succeeded
+      condvar.notify_one();
+    });
+
+    std::mutex mutex;
+    std::unique_lock<std::mutex> lock(mutex);
+    service_.run();
+    if (not notified) condvar.wait(lock);
+  }
+
   // Stops the stream.
   // @Note: does not stop the service.
   void disconnect() {
@@ -343,7 +387,15 @@ class Stream : public std::enable_shared_from_this<Stream> {
     return bytes;
   }
 
-  // Synchronous receive data.
+  // asynchronous send of amount of data
+  // Asks to strand to execute an asynchronous write on the socket.
+  void async_send(const std::string& message) {
+    // strand serializes the given handler
+    service_.get_strand().post(std::bind(
+        &Stream::async_send_handler, shared_from_this(), message));
+  }
+
+  // Synchronous receive.
   // The size of the data is defined by core::BUFFER_SIZE.
   // Each message including his size > core::BUFFER_SIZE will be imcompleted.
   std::string receive() {
@@ -352,18 +404,35 @@ class Stream : public std::enable_shared_from_this<Stream> {
     char buffer[core::BUFFER_SIZE] = {0};
 
     std::lock_guard<std::mutex> lock(mutex);
-    socket_.read_some(
-      asio::buffer(buffer, core::BUFFER_SIZE), error.get()
-    );
+    socket_.read_some(asio::buffer(buffer, core::BUFFER_SIZE), error.get());
 
     if (error.get()) core::Error::throw_asio_error(error.get());
 
     if (not std::string(buffer).size())
       throw core::Error::Read(
-        "Unexpected error occurred. asio::ip::tpc::socket::read_some failed. "
-        "0 bytes received."
-      );
+          "Unexpected error occurred. asio::ip::tpc::socket::read_some failed. "
+          "0 bytes received.");
     return std::string(buffer);
+  }
+
+  // asynchronous receive of data
+  // Asks to strand to execute an asynchronous read on the socket.
+  void async_receive() {
+    // strand serializes the given handler
+    service_.get_strand().post(std::bind(
+        &Stream::async_receive_handler, shared_from_this()));
+  }
+
+  // sets the callback wich will be invoked by the asynchronous send.
+  void set_write_handler(
+    const std::function<void(std::size_t, Stream&)>& callback) {
+      write_handler_ = callback;
+  }
+
+  // sets the callback wich will be invoked by the asynchronous receive.
+  void set_read_handler(
+    const std::function<void(std::string, Stream&)>& callback) {
+      read_handler_ = callback;
   }
 
   // returns if the stream is connected.
@@ -378,7 +447,59 @@ class Stream : public std::enable_shared_from_this<Stream> {
  private:
   // ctor
   Stream(core::Service& service)
-      : service_(service), connected_(false), socket_(service.get()) {}
+      : service_(service), connected_(false), socket_(service.get()),
+        read_handler_(nullptr), write_handler_(nullptr) {
+    std::memset(buffer_, 0, core::BUFFER_SIZE);
+  }
+
+  // Performs the asio::async_write operation.
+  // this function is post through the strand object to ensure that it
+  // will be invoked once and at the good moment.
+  void async_send_handler(const std::string& message) {
+
+    asio::async_write(
+        socket_, asio::buffer(message),
+        service_.get_strand().wrap(
+            [this](const asio::error_code& error, std::size_t bytes) {
+
+              if (error) throw asio::system_error(error);
+
+              if (not bytes)
+                throw core::Error::Write(
+                    "Unexpected error occurred. asio::async_write failed;");
+
+              std::mutex mutex;
+              // lock the execution of the handler to guarantee the thread safety
+              // many threads could possibly access this handler at the same time.
+              std::lock_guard<std::mutex> lock(mutex);
+              if (write_handler_) write_handler_(bytes, *this);
+            }));
+  }
+
+  // Performs an asynchronous read on the socket.
+  // this function is post through the strand object to ensure that it
+  // will be invoked once and at the good moment.
+  void async_receive_handler() {
+
+    socket_.async_read_some(
+      asio::buffer(buffer_, core::BUFFER_SIZE),
+      service_.get_strand().wrap(
+        [this](const asio::error_code& error, std::size_t bytes) {
+
+          if (error) throw asio::system_error(error);
+
+          if (not bytes)
+            throw core::Error::Read(
+              "Unexpected error occurred. asio::async_read failed.");
+
+          std::mutex mutex;
+          std::lock_guard<std::mutex> lock(mutex);
+          // lock the execution of the handler to guarantee the thread safety
+          // many threads could possibly access this handler at the same time.
+          if (read_handler_) read_handler_(std::string(buffer_), *this);
+          std::memset(buffer_, 0, core::BUFFER_SIZE);
+        }));
+  }
 
   // A reference on the service to perform I/O operations.
   core::Service& service_;
@@ -389,11 +510,14 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // TCP socket.
   asio::ip::tcp::socket socket_;
 
-  // Buffer for the incoming response.
-  std::vector<char> read_buffer_;
+  // Buffer.
+  char buffer_[core::BUFFER_SIZE];
 
-  // Buffer for the message to send.
-  std::vector<char> write_buffer_;
+  // Asynchronous receive handler.
+  std::function<void(std::string, Stream&)> read_handler_;
+
+  // Asynchronous send handler.
+  std::function<void(std::size_t, Stream&)> write_handler_;
 };
 
 }  // namespace network
