@@ -20,6 +20,7 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 #### Features & Usefulness
 
 - network:
+
   As Hermes is based on Asio, Hermes could not only provide a network software (client, server),
   but he is supporting TCP, UDP and could easily do asynchronous operations thanks to Asio's asynchronous model.
 
