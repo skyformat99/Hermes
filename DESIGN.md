@@ -4,8 +4,8 @@ In this document, we will define each feature of Hermes.
 We will describe how to use it. Let's begin with an overview of Hermes core functionalities.
 
 Hermes has three different parts:
-- Messenger:
-    A global entity which allows you to create a network software. A messenger could be a client or a server and it handles natively TCP/UDP protocol as well as asynchronous operations.
+- Network softwares:
+    coming soon.
 
 - Serialization:
     Hermes is a, fast and easy, way to send and receive serialized data through a socket.
@@ -21,143 +21,10 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 
 
-## Messenger
-
-  As i said earlier, Messenger allows you to create network softwares. You have
-  to define what kind of software you want. Client and server, both alike, could send
-  and receive data following TCP or UDP protocol (this also you will have to specify).
-  Messenger has been designed to be pretty simple to use, and you will have only a few lines
-  to write to perform operations.
-  Thanks to a boolean, you can specify to your messenger if it has to handle asynchronous
-  operations.
-  Below, you will find how to declare a Messenger, available methods that you could use to
-  manipulate your software and many examples.
+## Network softwares
 
 
-#### Constructor
-
-```c++
-  #include "Hermes.hpp"
-
-  using namespace Hermes;
-
-  Messenger(const std::string& software,
-            const std::string& protocol,
-            bool async,
-            const std::string& port,
-            const std::string& host = "127.0.0.1");
-```
-
-#### Software Methods
-
-```c++
-    #include "Hermes.hpp"
-
-    using namespace Hermes;
-
-    // I will show you how to use these methods appropriately
-    // according the different cases.
-    void run();
-    void disconnect();
-
-    // Synchronous send/receive operation.
-    std::size_t send(const std::string& message);
-    std::string receive();
-
-    // asynchronous send/receive operation
-    void async_send(const std::string& message,
-                    const std::function<void(std::size_t)>& callback = nullptr);
-
-    void async_receive(const std::function<void(std::string)>& callback);
-
-    // Same as run/disconnect i would come back on this later
-    void set_connection_handler(const std::function<void()>& handler);
-    void set_disconnection_handler(const std::function<void()>& handler);
-
-
-    // NOTE: to perform asynchronous operations you have to specify it to your messenger.
-```
-
-#### Synchronous softwares.
-
-- Exemple 1: TCP Client
-
-```c++
-  #include "Hermes.hpp"
-
-  #include <iostream>
-
-  using namespace Hermes;
-
-  // a Synchronous TCP client
-  // no host provided, so by default it's localhost
-  auto tcp_client = new Messenger("client", "tcp", false, "5050");
-
-
-  // If you want your client to perform operations at the connection
-  // you have to define the connection handler before run your client
-  tcp_client->set_connection_handler([&](){
-      // Do some stuff
-      // for example you could send or receive a message, here.
-  });
-
-
-  // Connect client
-  tcp_client->run();
-
-  // send/receive operations
-  auto bytes = tcp_client->send("message");
-  auto response = tcp_client->receive();
-
-
-  // Following the same idea you have the possibility to set a disconnection handler.
-  // It works like the connection handler and you also have to set it before call
-  // the disconnection of your client.
-  // NOTE: In case of error, the disconnect method is called before throwing the error
-  //       so the handler too if you had set one.
-
-```
-
-
-- Exemple 2: TCP Server
-
-
-
-```c++
-  #include "Hermes.hpp"
-
-  #include <iostream>
-
-  using namespace Hermes;
-
-  // a Synchronous TCP server
-  auto tcp_server = new Messenger("server", "tcp", false, "5050");
-
-
-  // If you want your server to perform operations when he has a connection
-  tcp_server->set_connection_handler([&](){
-        // Do some stuff
-    });
-
-  // Start server
-  tcp_server->run();
-
-  // send/receive operations
-  auto bytes = tcp_server->send("message");
-  auto response = tcp_server->receive();
-
-
-  // /!\ This is an iterative server, which means that it will handle
-  // /!\ one connection at a time
-
-  // Following the same idea you have the possibility to set a disconnection handler.
-  // It works like the connection handler and you also have to set it before call
-  // the disconnection of your client.
-  // NOTE: In case of error, the disconnect method is called before throwing the error
-  //       so the handler too if you had set one.
-
-```
-
+coming soon.
 
 
 
@@ -272,7 +139,7 @@ One more thing, as you should know, using protobuf involves to having defined a 
 
 
   // Asynchronous receive
-  protobuf::async_receive<package::message>("8080", [](com::Message response) {
+  protobuf::async_receive<package::message>("8080", [](package::message response) {
 
       // do some stuff
       auto descriptor = response.GetDescriptor();
@@ -289,7 +156,7 @@ Take a look to the protobuf tests, it may be usefull:
 #### flatbuffers
 
 
-Inconming.
+coming soon.
 
 
 
@@ -299,8 +166,7 @@ Inconming.
   In the repository include/modules, you will find the following modules:
 
   - Hermes_protobuf.hpp
-  - Hermes_messenger.hpp
-  - Hermes_flatbuffers.hpp
+  - more soon.
 
  A module works as Hermes. The modules are headers only so, you just have to
   include the desired one to use it.

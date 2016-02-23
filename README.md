@@ -62,9 +62,9 @@ You will find a full commmented design documentation, including several examples
 - Travis: [![Build Status](https://travis-ci.org/TommyStarK/Hermes.svg?branch=master)](https://travis-ci.org/TommyStarK/Hermes)
 
 module stability:
+- Network softwares: actively developed.
 - protobuf: implemented, tested and functionnal.
 - flatbuffers: not implemented yet.
-- messenger: actively developed.
 
 
 ## Contribution
