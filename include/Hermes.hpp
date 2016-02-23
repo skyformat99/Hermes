@@ -542,9 +542,9 @@ class Client {
       if (is_connected()) throw core::Error::User("Client Already connected.");
       session_->service().run();
       asio::ip::tcp::resolver resolver(service_.get());
-      asio::ip::tcp::resolver::query query(host_, port_);
-      endpoint_ = *resolver.resolve(query);
-      session_->connect(endpoint_);
+      session_->connect(
+        *resolver.resolve(asio::ip::tcp::resolver::query(host_, port_))
+      );
     } catch (std::exception& e) {
       core::Error::print(e.what());
     }
@@ -555,9 +555,9 @@ class Client {
     try {
       if (is_connected()) throw core::Error::User("Client Already connected.");
       asio::ip::tcp::resolver resolver(service_.get());
-      asio::ip::tcp::resolver::query query(host_, port_);
-      endpoint_ = *resolver.resolve(query);
-      session_->async_connect(endpoint_, callback);
+      session_->async_connect(
+        *resolver.resolve(asio::ip::tcp::resolver::query(host_, port_)),
+        callback);
     } catch (std::exception& e) {
       core::Error::print(e.what());
     }
@@ -637,7 +637,6 @@ class Client {
   std::string port_;
   core::Service service_;
   network::Stream::session session_;
-  asio::ip::tcp::endpoint endpoint_;
 };
 } // namespace tcp
 

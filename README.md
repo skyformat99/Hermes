@@ -20,8 +20,7 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
 #### Features & Usefulness
 
 - network:
-
-  As Hermes is based on Asio, Hermes could not only provide a network software (client, server),
+    As Hermes is based on Asio, Hermes could not only provide a network software (client, server),
   but he is supporting TCP, UDP and could easily do asynchronous operations thanks to Asio's asynchronous model.
 
 - serialization:
@@ -31,17 +30,19 @@ As i said, Hermes has been designed to be pretty simple to use, you will need to
   Above, the serialization protocols handled by Hermes.
 
 - Modularity:
-  Hermes is split into modules that allows user to choose only the desired one and include it
-  instead including the complete library. Furthermore, it makes easier the new feature
-  implementation.
+    Hermes is split into modules that allows the user to choose only the desired one and
+  include it instead including the complete library.
+  Furthermore, it makes easier the new feature implementation.
 
 ## Requirements
 - c++11
 
-The following libraries are required to use all Hermes features but they are included into Hermes repository if you do not have them.
+The following libraries are required to use all Hermes' features but they are included into Hermes repository if you do not have them.
 - Asio 1.10.6
 - Google Protocol Buffers
 - Google FlatBuffers
+
+/!\ install libraries before using Hermes.
 
 ## Compiling
 Hermes is a header only library, so there is nothing to build and to link with your program.
@@ -63,9 +64,12 @@ You will find a full commmented design documentation, including several examples
 - Travis: [![Build Status](https://travis-ci.org/TommyStarK/Hermes.svg?branch=master)](https://travis-ci.org/TommyStarK/Hermes)
 
 module stability:
-- Network softwares: actively developed.
-- protobuf: implemented, tested and functionnal.
-- flatbuffers: not implemented yet.
+- Network softwares:
+    actively developed.
+- protobuf:
+    implemented, tested and functionnal.
+- flatbuffers:
+    not implemented yet.
 
 
 ## Contribution

@@ -225,7 +225,7 @@ SCENARIO("testing Stream session features and thread safety", "[network]") {
     *
     *
     *
-    *   The followings scenarios are comment to ensure that the build wont
+    *   The followings scenarios are commented to ensure that the build wont
     *   fail on travis.
     *   No server will be listenning on the specified port.
     *
@@ -405,7 +405,7 @@ SCENARIO("testing Stream session features and thread safety", "[network]") {
 *
 *
 *
-*   The followings scenarios are comment to ensure that the build wont
+*   The followings scenarios are commented to ensure that the build wont
 *   fail on travis.
 *   No server will be listenning on the specified port.
 *
