@@ -4,631 +4,566 @@
 
 #include "Communication.pb.h"
 
-#include <vector>
+using namespace hermes::core;
+using namespace hermes::network;
+
+SCENARIO("I/O Services", "[core]") {
+  GIVEN("Service object, routine function, f function to print parameter") {
+    Service service;
+    bool test = true;
+
+    auto routine = [](asio::io_context& service) { service.run(); };
+
+    auto f = [](size_t n) {
+
+      std::this_thread::sleep_for(std::chrono::microseconds(1000));
+
+      {
+        std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+        std::cout << "[" << std::this_thread::get_id() << "] " << n
+                  << std::endl;
+      }
+
+    };
+
+    WHEN(
+        "Running the service in a dedicated thread without adding a work."
+        "\n>>> should not be stuck") {
+      service.run();
+      REQUIRE(test);
+      service.stop();
+    }
+
+    WHEN(
+        "Reset work object to run the service in our main thread."
+        "\n>>> should not be stuck") {
+      test = false;
+      service.get_work().reset();
+      service.get().run();
+      REQUIRE(not test);
+      service.get().stop();
+    }
+
+    WHEN(
+        "Testing post() method using a thread pool."
+        "\n>>> no error should be thrown") {
+      std::vector<std::thread> threads;
+
+      for (int i = 0; i < 2; ++i) {
+        threads.push_back(
+            std::thread(std::bind(routine, std::ref(service.get()))));
+      }
+
+      service.post(std::bind(f, 1));
+      service.post(std::bind(f, 2));
+      service.post(std::bind(f, 3));
+      service.post(std::bind(f, 4));
+
+      service.get_work().reset();
+      for (int i = 0; i < 2; i++) REQUIRE_NOTHROW(threads[i].join());
+    }
+
+    WHEN(
+        "Testing strand object."
+        "\n>>> no error should be thrown") {
+      std::vector<std::thread> threads;
+
+      for (int i = 0; i < 2; ++i) {
+        threads.push_back(
+            std::thread(std::bind(routine, std::ref(service.get()))));
+      }
+
+      service.get_strand().post(std::bind(f, 5));
+      service.get_strand().post(std::bind(f, 6));
+      service.get_strand().post(std::bind(f, 7));
+      service.get_strand().post(std::bind(f, 8));
+
+      service.get_work().reset();
+      for (int i = 0; i < 2; i++) REQUIRE_NOTHROW(threads[i].join());
+    }
+
+    WHEN("testing stop() service") {
+      REQUIRE(not service.is_stop());
+      service.stop();
+      REQUIRE(service.is_stop());
+    }
+  }
+}
+
+SCENARIO("Dedicated class for Error handling", "[core]") {
+  GIVEN("Error class, 4 object functions to test the different error type") {
+    Error error;
+
+    auto user = []() { throw Error::User("logic error"); };
+
+    auto connection =
+        []() { throw Error::Connection("connect operation failed"); };
+
+    auto write = []() { throw Error::Write("write operation failed"); };
+
+    auto read = []() { throw Error::Read("Read operation failed"); };
+
+    WHEN("throwing logic error made by the user") {
+      try {
+        user();
+      } catch (std::exception& e) {
+        REQUIRE(std::string(e.what()) == "logic error");
+      }
+    }
+
+    WHEN("throwing connect exception") {
+      try {
+        connection();
+      } catch (std::exception& e) {
+        REQUIRE(std::string(e.what()) == "connect operation failed");
+      }
+    }
+
+    WHEN("throwing write exception") {
+      try {
+        write();
+      } catch (std::exception& e) {
+        REQUIRE(std::string(e.what()) == "write operation failed");
+      }
+    }
+
+    WHEN("throwing read exception") {
+      try {
+        read();
+      } catch (std::exception& e) {
+        REQUIRE(std::string(e.what()) == "Read operation failed");
+      }
+    }
+  }
+}
+
+SCENARIO("testing Stream session features and thread safety", "[network]") {
+  GIVEN("I/O service object") {
+    Service service;
+
+    WHEN(
+        "creating a new stream session."
+        "\n>>> should not be stuck") {
+      auto session = Stream::new_session(service);
+
+      session->service().get_work().reset();
+      session->service().get().run();
+      REQUIRE(session);
+      REQUIRE(not session->service().is_stop());
+      REQUIRE(not session->socket().is_open());
+      session->service().get().stop();
+    }
+
+    WHEN(
+        "adding a work to the session."
+        "\n>>> should print [thread_id_in_wich_run_service_has_been_called] :)") {
+      auto session = Stream::new_session(service);
+
+      auto fct = [](const std::string& debug) {
+        std::cout << "[" << std::this_thread::get_id() << "] " << debug << "\n";
+        REQUIRE(debug == ":)");
+      };
+
+      session->service().run();
+      session->service().get_strand().post(std::bind(fct, ":)"));
+      session->service().stop();
+    }
+
+    WHEN(
+        "connecting the tcp socket in local to an used port to throw an error "
+        "\nthen to google to success. Disconnecting the session at the end.") {
+      auto session = Stream::new_session(service);
+
+      asio::ip::tcp::resolver resolver(service.get());
+
+      // No server listenning on the specified port.
+      // connection to endpoint2 has to throw.
+      asio::ip::tcp::resolver::query query2("127.0.0.1", "8888");
+      asio::ip::tcp::endpoint endpoint2 = *resolver.resolve(query2);
+      REQUIRE_THROWS(session->connect(endpoint2));
+
+      asio::ip::tcp::resolver::query query("www.google.com", "80");
+      asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+      REQUIRE_NOTHROW(session->connect(endpoint));
+
+      auto disconnected = false;
+
+      session->service().run();
+      session->disconnect();
+      disconnected = true;
+      session->service().stop();
+      REQUIRE(disconnected);
+    }
+
+    WHEN(
+        "Passing a reference on the stream to many threads to call disconnect()"
+        "\nTesting Thread Safety.") {
+      auto session = Stream::new_session(service);
+
+      auto fct = [](Stream::session& session) { session->disconnect(); };
+
+      asio::ip::tcp::resolver resolver(service.get());
+      asio::ip::tcp::resolver::query query("www.google.com", "80");
+      asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+
+      session->service().run();
+      REQUIRE_NOTHROW(session->connect(endpoint));
+
+      std::vector<std::thread> threads;
+      for (int i = 0; i < 100; i++)
+        threads.push_back(std::thread(std::bind(fct, session)));
+
+      for (int i = 0; i < 100; i++) threads[i].join();
+
+      session->service().stop();
+      REQUIRE(not session->is_connected());
+    }
+
+    /**
+    *     <<< Tests with ncat >>>
+    *
+    *
+    *
+    *   The followings scenarios are comment to ensure that the build wont
+    *   fail on travis.
+    *   No server will be listenning on the specified port.
+    *
+    *
+    *
+    */
+
+    // WHEN("sending tcp message to netcat on port 9999.") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //   session->service().run();
+    //   REQUIRE_NOTHROW(session->connect(endpoint));
+    //   session->send("test :)");
+    //   auto response = session->receive();
+    //   std::cout << response << std::endl;
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("sending tcp message to netcat on port 9999 from 100 threads.") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   auto fct = [](Stream::session& session) {
+    //     auto bytes = session->send(":)");
+    //     REQUIRE(bytes == 2);
+    //     auto response = session->receive();
+    //     {
+    //       std::mutex mutex;
+    //       std::lock_guard<std::mutex> lock(mutex);
+    //       std::cout << response << std::endl;
+    //     }
+    //   };
+    //
+    //   session->service().run();
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //   REQUIRE_NOTHROW(session->connect(endpoint));
+    //
+    //   std::vector<std::thread> threads;
+    //   for (int i = 0; i < 20; i++)
+    //     threads.push_back(std::thread(std::bind(fct, session)));
+    //
+    //   for (int i = 0; i < 20; i++) threads[i].join();
+    //
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("asynchronous connection") {
+    //   auto session = Stream::new_session(service);
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //
+    //   REQUIRE_NOTHROW(session->async_connect(endpoint));
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("asynchronous connection and asynchronous send") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //
+    //   REQUIRE_NOTHROW(session->async_connect(endpoint));
+    //
+    //   session->set_write_handler([](std::size_t bytes, Stream& session){
+    //     std::cout << "bytes: " << bytes << std::endl;
+    //     session.send("<3<3<3<3");
+    //     std::cout << session.receive() << std::endl;
+    //   });
+    //
+    //   session->async_send("123456789\n");
+    //   session->send("987645321\n");
+    //   std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("asynchronous connection + 100 asynchronous send") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   auto fct = [](Stream::session& session){
+    //     session->async_send(":)");
+    //   };
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //
+    //   REQUIRE_NOTHROW(session->async_connect(endpoint));
+    //
+    //   session->set_write_handler([](std::size_t bytes, Stream& session){
+    //     std::cout << "bytes: " << bytes << std::endl;
+    //     session.send("<3<3<3<3");
+    //   });
+    //
+    //   std::vector<std::thread> threads;
+    //   for (int i = 0; i < 100; i++)
+    //     threads.push_back(std::thread(std::bind(fct, session)));
+    //
+    //   for (int i = 0; i < 100; i++) threads[i].join();
+    //
+    //   std::this_thread::sleep_for(std::chrono::microseconds(5000));
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("asynchronous connection/receive") {
+    //   auto session = Stream::new_session(service);
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //
+    //   REQUIRE_NOTHROW(session->async_connect(endpoint));
+    //
+    //   session->set_read_handler([](std::string response, Stream& session){
+    //     std::cout << "response: " << response << std::endl;
+    //   });
+    //
+    //   session->async_receive();
+    //   std::cout << session->receive() << std::endl;
+    //   std::this_thread::sleep_for(std::chrono::microseconds(10000));
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+    // WHEN("asynchronous connection/receive + 100 async_receive") {
+    //   auto session = Stream::new_session(service);
+    //
+    //     auto fct = [](Stream::session& session) {
+    //       session->async_receive();
+    //   };
+    //
+    //   asio::ip::tcp::resolver resolver(service.get());
+    //   asio::ip::tcp::resolver::query query("127.0.0.1", "9999");
+    //   asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
+    //
+    //   REQUIRE_NOTHROW(session->async_connect(endpoint));
+    //
+    //   session->set_read_handler([](std::string response, Stream& session){
+    //     std::cout << "response: " << response << std::endl;
+    //   });
+    //
+    //   std::vector<std::thread> threads;
+    //   for (int i = 0; i < 100; i++)
+    //     threads.push_back(std::thread(std::bind(fct, session)));
+    //
+    //   for (int i = 0; i < 100; i++) threads[i].join();
+    //
+    //   std::this_thread::sleep_for(std::chrono::microseconds(100000));
+    //   session->disconnect();
+    //   session->service().stop();
+    //   REQUIRE(not session->is_connected());
+    // }
+
+  }
+}
 
 /**
+*     <<< Tests with ncat >>>
 *
-* Module Messenger: tests
+*
+*
+*   The followings scenarios are comment to ensure that the build wont
+*   fail on travis.
+*   No server will be listenning on the specified port.
+*
 *
 *
 */
 
-
+// SCENARIO("testing tcp client behavior and thread safety", "[tcp]") {
 //
-// testing Session object
+//   GIVEN("TCP client") {
 //
-SCENARIO("Session object, a socket options manager.", "[Messenger::session]") {
-  GIVEN("Session class") {
-    asio::io_context io_service;
-    asio::ip::tcp::socket socket(io_service);
-    Hermes::Session<asio::ip::tcp::socket> session(socket);
-
-    WHEN("you check options") {
-      REQUIRE(session.is_socket_unused() == true);
-      REQUIRE(not session.is_ready_for_writting());
-      REQUIRE(not session.is_ready_for_reading());
-      REQUIRE(not session.is_option_activated("state"));
-      REQUIRE(not session.is_option_activated("deadline"));
-      REQUIRE(not session.is_option_activated("heartbeat"));
-      REQUIRE(session.get_heartbeat_message() == "<3");
-    }
-  }
-
-  GIVEN("Session class") {
-    asio::io_context io_service;
-    asio::ip::tcp::socket socket(io_service);
-    Hermes::Session<asio::ip::tcp::socket> session(socket);
-
-    WHEN("you set state READING to socket") {
-      session.set_state_to_socket(Hermes::READING);
-      REQUIRE(not session.is_socket_unused());
-      REQUIRE(not session.is_ready_for_writting());
-      REQUIRE(session.is_ready_for_reading());
-    }
-
-    WHEN("you set state WRITTING to socket") {
-      session.set_state_to_socket(Hermes::WRITTING);
-      REQUIRE(not session.is_socket_unused());
-      REQUIRE(session.is_ready_for_writting());
-      REQUIRE(not session.is_ready_for_reading());
-    }
-
-    WHEN("you set new heartbeat message") {
-      session.set_heartbeat_message("test");
-      REQUIRE(session.get_heartbeat_message() == "test");
-    }
-  }
-}
-
+//     hermes::tcp::Client client("127.0.0.1", "9999");
 //
-// testing stream's session
+//     WHEN("connecting the client and perform send/receive operation") {
 //
-SCENARIO(
-    "Stream class represents a TCP connection. Stream manages operations "
-    "on the socket. Furthermore, options can be set to the socket. Stream class "
-    "owns a session object, managing socket's option.",
-    "[stream]") {
-  GIVEN("TCP stream") {
-    asio::io_context io_service;
-
-    auto stream = Hermes::Stream<asio::ip::tcp::socket>::create(io_service);
-
-    WHEN("when you check session options") {
-      REQUIRE(stream);
-      REQUIRE(not stream->socket().is_open());
-      REQUIRE(stream->session().is_socket_unused());
-      REQUIRE(not stream->session().is_ready_for_writting());
-      REQUIRE(not stream->session().is_ready_for_reading());
-      REQUIRE(not stream->session().is_option_activated("state"));
-      REQUIRE(not stream->session().is_option_activated("deadline"));
-      REQUIRE(not stream->session().is_option_activated("heartbeat"));
-      REQUIRE(stream->session().get_heartbeat_message() == "<3");
-    }
-  }
-
-  GIVEN("TCP stream") {
-    asio::io_context io_service;
-
-    auto stream = Hermes::Stream<asio::ip::tcp::socket>::create(io_service);
-
-    WHEN("You set state READING to socket.") {
-      stream->session().set_state_to_socket(Hermes::READING);
-      REQUIRE(not stream->session().is_socket_unused());
-      REQUIRE(not stream->session().is_ready_for_writting());
-      REQUIRE(stream->session().is_ready_for_reading());
-    }
-
-    WHEN("You set state WRITTING to socket.") {
-      stream->session().set_state_to_socket(Hermes::WRITTING);
-      REQUIRE(not stream->session().is_socket_unused());
-      REQUIRE(stream->session().is_ready_for_writting());
-      REQUIRE(not stream->session().is_ready_for_reading());
-    }
-
-    WHEN("You set a new heartbeat message.") {
-      stream->session().set_heartbeat_message("test");
-      REQUIRE_NOTHROW(stream->session().get_heartbeat_message() == "test");
-    }
-
-    WHEN("You open the socket.") {
-      stream->socket().open(asio::ip::tcp::v4());
-      REQUIRE(stream->socket().is_open());
-    }
-  }
-}
-
-//
-// testing datagram's session
-//
-// SCENARIO(
-//     "Datagram class is a handler to manage UDP operations on a socket "
-//     "Same as Stream, Datagram owns a session object to handle socket's option.",
-//     "[datagram]") {
-//   GIVEN("UDP datagram") {
-//     asio::io_context io_service;
-//
-//     auto datagram = Hermes::Stream<asio::ip::udp::socket>::create(io_service);
-//
-//     WHEN("when you check session options") {
-//       REQUIRE(datagram);
-//       REQUIRE(not datagram->socket().is_open());
-//       REQUIRE(datagram->session().is_socket_unused());
-//       REQUIRE(not datagram->session().is_ready_for_writting());
-//       REQUIRE(not datagram->session().is_ready_for_reading());
-//       REQUIRE(not datagram->session().is_option_activated("state"));
-//       REQUIRE(not datagram->session().is_option_activated("deadline"));
-//       REQUIRE(not datagram->session().is_option_activated("heartbeat"));
-//       REQUIRE(datagram->session().get_heartbeat_message() == "<3");
-//     }
-//   }
-//
-//   GIVEN("UDP datagram") {
-//     asio::io_context io_service;
-//
-//     auto datagram = Hermes::Stream<asio::ip::udp::socket>::create(io_service);
-//
-//     WHEN("You set state READING to socket.") {
-//       datagram->session().set_state_to_socket(Hermes::READING);
-//       REQUIRE(not datagram->session().is_socket_unused());
-//       REQUIRE(not datagram->session().is_ready_for_writting());
-//       REQUIRE(datagram->session().is_ready_for_reading());
+//       client.connect();
+//       client.send("message");
+//       std::cout << client.receive() << std::endl;
+//       client.disconnect();
 //     }
 //
-//     WHEN("You set state WRITTING to socket.") {
-//       datagram->session().set_state_to_socket(Hermes::WRITTING);
-//       REQUIRE(not datagram->session().is_socket_unused());
-//       REQUIRE(datagram->session().is_ready_for_writting());
-//       REQUIRE(not datagram->session().is_ready_for_reading());
+//     WHEN("using asynchronous operations") {
+//
+//       client.set_send_handler([](std::size_t bytes, hermes::network::Stream& session){
+//         std::cout << "bytes: " << bytes << std::endl;
+//       });
+//
+//       client.set_receive_handler([](std::string received, hermes::network::Stream& session){
+//         std::cout << "received: " << received << std::endl;
+//       });
+//
+//       client.async_connect();
+//       client.async_send("test1");
+//       client.send("test2");
+//       std::cout << client.receive() << std::endl;
+//       client.disconnect();
 //     }
 //
-//     WHEN("You set a new heartbeat message.") {
-//       datagram->session().set_heartbeat_message("test");
-//       REQUIRE_NOTHROW(datagram->session().get_heartbeat_message() == "test");
-//     }
+//     WHEN("testing thread safety") {
 //
-//     WHEN("You open the socket.") {
-//       datagram->socket().open(asio::ip::udp::v4());
-//       REQUIRE(datagram->socket().is_open());
+//       auto fct = [](hermes::tcp::Client& client) {
+//         client.async_send("async\n");
+//         client.send("not async\n");
+//       };
+//
+//       client.set_send_handler([](std::size_t bytes, hermes::network::Stream& session){
+//         std::cout << "bytes: " << bytes << std::endl;
+//       });
+//
+//       REQUIRE_NOTHROW(client.async_connect());
+//       REQUIRE(client.is_connected());
+//
+//       std::vector<std::thread> threads;
+//
+//       for (int i = 0; i < 100; i++)
+//         threads.push_back(std::thread(std::bind(fct, std::ref(client))));
+//
+//       for (int i = 0; i < 100; i++) threads[i].join();
+//
+//       client.disconnect();
+//       REQUIRE(not client.is_connected());
 //     }
 //   }
 // }
 
-//
-// testing Synchronous tcp softwares
-//
-SCENARIO("Hermes is able to create Messengers", "[Messenger]") {
-  GIVEN("Synchronous TCP server/client") {
-    auto server = new Hermes::Messenger("server", "tcp", false, "8888");
-    auto client = new Hermes::Messenger("CliEnT", "TcP", false, "8888");
+SCENARIO("testing hermes protobuf operations", "[protobuf]") {
+  GIVEN("protobuf message") {
+      com::Message message;
 
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and you send a message to the server.") {
-      std::thread a([&]() {
-        server->run();
-        auto request = server->receive();
-        REQUIRE(request == "test");
-        server->disconnect();
-      });
+      message.set_name("aaaa");
+      message.set_object("bbbb");
+      message.set_from("cccc");
+      message.set_to("dddd");
+      message.set_msg("eeee");
 
-      std::thread b([&]() {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
-        client->run();
-        client->send("test");
-        client->disconnect();
-      });
+      // WHEN("sending protobuf") {
+      //   REQUIRE_NOTHROW(
+      //     hermes::protobuf::send<com::Message>(
+      //       "127.0.0.1", "9999", message
+      //     ));
+      // }
 
-      a.join();
-      b.join();
-    }
+      WHEN("testing send and receive from 2 separate threads") {
 
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and the server send you a message at the connection") {
-      std::thread a([&]() {
-        server->run();
-        server->send("test");
-        server->disconnect();
-      });
-
-      std::thread b([&]() {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
-        client->run();
-        auto response = client->receive();
-        REQUIRE(response == "test");
-        client->disconnect();
-      });
-
-      a.join();
-      b.join();
-    }
-
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and send to it a message at the connection using the connection "
-        "handler.") {
-      std::thread a([&]() {
-        server->run();
-        auto request = server->receive();
-        REQUIRE(request == "test");
-        server->disconnect();
-      });
-
-      std::thread b([&]() {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
-        client->set_connection_handler([&]() {
-          client->send("test");
-          client->disconnect();
+        std::thread a([&](){
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+          REQUIRE_NOTHROW(
+                hermes::protobuf::send<com::Message>(
+                  "127.0.0.1", "50501", message
+          ));
         });
-        client->run();
-      });
 
-      a.join();
-      b.join();
-    }
+        std::thread b([](){
+          std::string handler("");
 
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and the server send you a message at the connection using the "
-        "connection handler.") {
-      std::thread a([&]() {
-        server->set_connection_handler([&]() {
-          server->send("test");
-          server->disconnect();
+          auto result = hermes::protobuf::receive<com::Message>("50501");
+          REQUIRE(result.object() == "bbbb");
         });
-        server->run();
-      });
 
-      std::thread b([&]() {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
-        client->run();
-        auto response = client->receive();
-        REQUIRE(response == "test");
-        client->disconnect();
-      });
 
-      a.join();
-      b.join();
-    }
+        a.join();
+        b.join();
+      }
 
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and you send 100 requests to the server.") {
-      std::thread a([&]() {
 
-          server->set_connection_handler([&]() {
-            for (;;) {
-                auto request = server->receive();
-                if (request == "99")
-                  break ;
-              }
-            server->disconnect();
-          });
-          server->run();
-      });
+      WHEN("testing async_send") {
 
-      std::thread b([&]() {
+        std::thread a([&](){
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+          REQUIRE_NOTHROW(
+                hermes::protobuf::async_send<com::Message>(
+                  "127.0.0.1", "50501", message,
+                  [](std::size_t bytes) {
+                    std::cout << "bytes: " << bytes << std::endl;
+                    REQUIRE(bytes == 30);
+                  }
+          ));
+        });
 
-        client->set_connection_handler([&](){
-            for (int i = 0; i < 100; i++) {
-              std::this_thread::sleep_for(std::chrono::microseconds(250));
-              client->send(std::to_string(i));
+        std::thread b([](){
+          auto result = hermes::protobuf::receive<com::Message>("50501");
+          REQUIRE(result.object() == "bbbb");
+        });
+
+
+        a.join();
+        b.join();
+      }
+
+
+      WHEN("testing async_receive") {
+
+        std::thread a([&](){
+          std::this_thread::sleep_for(std::chrono::seconds(1));
+          REQUIRE_NOTHROW(
+                hermes::protobuf::async_send<com::Message>(
+                  "127.0.0.1", "50501", message,
+                  [](std::size_t bytes) {
+                    std::cout << "bytes: " << bytes << std::endl;
+                    REQUIRE(bytes == 30);
+                  }
+          ));
+        });
+
+        std::thread b([](){
+          hermes::protobuf::async_receive<com::Message>(
+            "50501",
+            [](com::Message message){
+              std::string s;
+              message.SerializeToString(&s);
+              std::cout << "async receive: " << s << std::endl;
             }
-            client->disconnect();
-        });
-        client->run();
-      });
-
-      a.join();
-      b.join();
-    }
-
-    WHEN(
-        "you connect 100 clients to a server running in a separate thread "
-        "and each client send a message before disconnect.") {
-
-
-      std::thread a([&]() {
-
-        bool disconnect_server = false;
-
-        server->set_disconnection_handler([&]() {
-          REQUIRE(disconnect_server == true);
+          );
         });
 
-        for (;;) {
+        a.join();
+        b.join();
+      }
 
-            server->set_connection_handler([&](){
-                auto request = server->receive();
-                if (request == "99") disconnect_server = true;
-
-            });
-            if (disconnect_server)
-              break ;
-            REQUIRE_NOTHROW(server->run());
-        }
-        REQUIRE_NOTHROW(server->disconnect());
-      });
-
-      std::thread b([]() {
-
-        for (int i = 0; i < 100; i ++) {
-          auto client = new Hermes::Messenger("CliEnT", "TcP", false, "8888");
-
-          std::this_thread::sleep_for(std::chrono::microseconds(250));
-          client->set_connection_handler([&](){
-            client->send(std::to_string(i));
-            client->disconnect();
-          });
-
-          client->run();
-          delete client;
-        }
-
-      });
-
-      a.join();
-      b.join();
-    }
-
-    WHEN(
-        "you connect a client to a server running in a separate thread "
-        "and you use the disconnect handlers.") {
-      std::thread a([&]() {
-
-        auto f = []() {
-          bool test = false;
-
-          REQUIRE(not test);
-        };
-
-        server->set_disconnection_handler(f);
-        server->run();
-        server->disconnect();
-      });
-
-      std::thread b([&]() {
-        std::this_thread::sleep_for(std::chrono::microseconds(250));
-
-        auto f = []() {
-          bool test = true;
-
-          REQUIRE(test);
-        };
-
-        client->set_disconnection_handler(f);
-        client->run();
-        client->disconnect();
-      });
-
-      a.join();
-      b.join();
-    }
   }
-}
-
-
-//
-// testing asynchronous tcp softwares
-//
-SCENARIO(
-  "Hermes is able to create Messengers able to perform asynchronous operations",
-  "[messenger]") {
-  GIVEN("Asynchronous TCP client/server") {
-    // auto server = new Hermes::Messenger("serVeR", "tcp", true, "9999");
-    auto client = new Hermes::Messenger("CliEnT", "tcp", true, "9999");
-
-
-
-    WHEN("") {
-
-      client->set_connection_handler([&](){
-          std::cout << "connected\n";
-      });
-
-      client->run();
-      client->async_send(":)", [&](std::size_t bytes){
-        std::cout << bytes << std::endl;
-      });
-
-      client->async_receive([](std::string response){
-        std::cout << response << std::endl;
-      });
-      client->disconnect();
-    }
-  }
-}
-
-
-//
-// testing synchronous udp softwares
-//
-// SCENARIO() {
-//   GIVEN("Synchronous UDP client/server") {
-//     auto server = new Hermes::Messenger("serVeR", "UDP", false, "8888");
-//     auto client = new Hermes::Messenger("CliEnT", "udP", false, "8888");
-//
-//     WHEN("you send a message") {
-//
-//       std::thread a([&](){
-//         server->run();
-//         auto response = server->receive();
-//         std::cout << response << std::endl;
-//         server->disconnect();
-//       });
-//
-//       std::thread b([&](){
-//           std::this_thread::sleep_for(std::chrono::microseconds(250));
-//           client->run();
-//           client->send("123456789\n");
-//           client->send("987654321\n");
-//           // auto response = client->receive();
-//           // std::cout << response << std::endl;
-//           client->disconnect();
-//       });
-//
-//
-//       a.join();
-//       b.join();
-//     }
-//   }
-// }
-
-
-
-
-/**
-*
-*
-* Module Serialization - protobuf: tests
-*
-*
-*/
-SCENARIO("Hermes is able to send and receive serialized data.", "[protobuf]") {
-  GIVEN("Google protobuf message") {
-    com::Message message;
-
-    message.set_name("name");
-    message.set_object("object");
-    message.set_from("from");
-    message.set_to("to");
-    message.set_msg("msg");
-
-    WHEN(
-        "you send a serialized protobuf message from a thread "
-        "and you receive and unserialize it from another thread") {
-      std::thread thread_receive([]() {
-        auto test = Hermes::protobuf::receive<com::Message>("8888");
-        REQUIRE(test.name() == "name");
-        REQUIRE(test.object() == "object");
-        REQUIRE(test.from() == "from");
-        REQUIRE(test.to() == "to");
-        REQUIRE(test.msg() == "msg");
-      });
-
-      std::thread thread_send([&]() {
-        std::string serialized;
-
-        message.SerializeToString(&serialized);
-        std::this_thread::sleep_for(std::chrono::microseconds(150));
-        auto size =
-            Hermes::protobuf::send<com::Message>("127.0.0.1", "8888", message);
-        REQUIRE(size == serialized.size());
-      });
-
-      thread_send.join();
-      thread_receive.join();
-    }
-
-    WHEN(
-        "you send 100 serialized protobuf messages from a thread "
-        "and you receive and unserialize them from another thread") {
-      std::thread a([&]() {
-        for (int i = 0; i < 100; i++) {
-          auto test = Hermes::protobuf::receive<com::Message>("8888");
-          REQUIRE(test.name() == "name");
-          REQUIRE(test.object() == "object");
-          REQUIRE(test.from() == "from");
-          REQUIRE(test.to() == "to");
-          REQUIRE(test.msg() == "msg");
-        }
-      });
-
-      std::thread b([&]() {
-        for (int i = 0; i < 100; i++) {
-          std::string serialized;
-
-          message.SerializeToString(&serialized);
-          std::this_thread::sleep_for(std::chrono::microseconds(150));
-          auto size = Hermes::protobuf::send<com::Message>("127.0.0.1", "8888",
-                                                           message);
-          REQUIRE(size == serialized.size());
-        }
-      });
-
-      a.join();
-      b.join();
-    }
-  }
-
-  // GIVEN("Google protobuf message") {
-  //   com::Message message;
-  //
-  //   message.set_name("name: ok");
-  //   message.set_object("object: ok");
-  //   message.set_from("from: ok");
-  //   message.set_to("to: ok");
-  //   message.set_msg("msg: ok");
-  //
-  //   WHEN(
-  //       "you send, asynchronously, a serialized protobuf message from a thread "
-  //       "and you receive and unserialize it from another thread") {
-  //     std::thread thread_receive([&]() {
-  //       Hermes::protobuf::async_receive<com::Message>(
-  //           "8888", [](com::Message response) {
-  //             REQUIRE(response.name() == "name: ok");
-  //             REQUIRE(response.object() == "object: ok");
-  //             REQUIRE(response.from() == "from: ok");
-  //             REQUIRE(response.to() == "to: ok");
-  //             REQUIRE(response.msg() == "msg: ok");
-  //             std::cout << ":)\n";
-  //           });
-  //     });
-  //
-  //     std::thread thread_send([&]() {
-  //       std::this_thread::sleep_for(std::chrono::microseconds(150));
-  //       Hermes::protobuf::async_send<com::Message>(
-  //           "127.0.0.1", "8888", message,
-  //           [](std::size_t bytes) { REQUIRE(bytes == 49); });
-  //     });
-  //
-  //     thread_send.join();
-  //     thread_receive.join();
-  //   }
-  //
-    // WHEN(
-    //     "you send, asynchronously, 100 serialized protobuf messages from a "
-    //     "thread "
-    //     "and you receive and unserialize it from another thread") {
-    //   std::thread a([&]() {
-    //     for (int i = 0; i < 100; i++) {
-    //       Hermes::protobuf::async_receive<com::Message>(
-    //           "8888", [](com::Message response) {
-    //             REQUIRE(response.name() == "name: ok");
-    //             REQUIRE(response.object() == "object: ok");
-    //             REQUIRE(response.from() == "from: ok");
-    //             REQUIRE(response.to() == "to: ok");
-    //             REQUIRE(response.msg() == "msg: ok");
-    //             std::cout << ":)\n";
-    //           });
-    //     }
-    //   });
-    //
-    //   std::thread b([&]() {
-    //     for (int i = 0; i < 100; i++) {
-    //       std::this_thread::sleep_for(std::chrono::microseconds(250));
-    //       Hermes::protobuf::async_send<com::Message>(
-    //           "127.0.0.1", "8888", message,
-    //           [](std::size_t bytes) { REQUIRE(bytes == 49); });
-    //     }
-    //   });
-    //
-    //   a.join();
-    //   b.join();
-    // }
-    //
-    // WHEN("N") {
-    //
-    //     std::vector<std::thread> threads, threads2;
-    //
-    //     for (int i = 0; i < 100; i++) {
-    //       threads.push_back(std::thread([&](){
-    //         Hermes::protobuf::async_receive<com::Message>(
-    //             "8888", [](com::Message response) {
-    //               REQUIRE(response.name() == "name: ok");
-    //               REQUIRE(response.object() == "object: ok");
-    //               REQUIRE(response.from() == "from: ok");
-    //               REQUIRE(response.to() == "to: ok");
-    //               REQUIRE(response.msg() == "msg: ok");
-    //               std::cout << "<3\n";
-    //         });
-    //       }));
-    //     }
-    //
-    //     for (int i = 0; i < 100; i++) {
-    //         threads2.push_back(
-    //           std::thread([&](){
-    //
-    //             std::this_thread::sleep_for(std::chrono::microseconds(250));
-    //             Hermes::protobuf::async_send<com::Message>(
-    //                 "127.0.0.1", "8888", message,
-    //                 [](std::size_t bytes) { std::cout << bytes << "\n"; });
-    //           })
-    //         );
-    //     }
-    //
-    //     for (int i = 0; i < 100; i++) threads[i].join();
-    //     for (int i = 0; i < 100; i++) threads2[i].join();
-    // }
-  // }
 }
