@@ -440,7 +440,9 @@ SCENARIO("testing Stream session features and thread safety", "[network]") {
 //       client.async_connect();
 //       client.async_send("test1");
 //       client.send("test2");
+//       client.async_receive();
 //       std::cout << client.receive() << std::endl;
+//       std::this_thread::sleep_for(std::chrono::seconds(1));
 //       client.disconnect();
 //     }
 //
@@ -480,13 +482,6 @@ SCENARIO("testing hermes protobuf operations", "[protobuf]") {
       message.set_from("cccc");
       message.set_to("dddd");
       message.set_msg("eeee");
-
-      // WHEN("sending protobuf") {
-      //   REQUIRE_NOTHROW(
-      //     hermes::protobuf::send<com::Message>(
-      //       "127.0.0.1", "9999", message
-      //     ));
-      // }
 
       WHEN("testing send and receive from 2 separate threads") {
 
