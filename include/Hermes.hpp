@@ -167,11 +167,11 @@ class Error {
 
   asio::error_code& get() { return error_; }
 
-  static void print(const std::string& msg) { std::cerr << msg << std::endl; }
+  bool exist() { return error_ ? true : false; }
 
-  static void throw_asio_error(asio::error_code& error) {
-    throw asio::system_error(error);
-  }
+  void throw_it() { throw asio::system_error(error_); }
+
+  static void print(const std::string& err) { std::cerr << err << std::endl; }
 
   // logic errors handler
   class User : public std::logic_error {
@@ -290,7 +290,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     core::Error error;
 
     socket_.connect(endpoint, error.get());
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
     connected_ = true;
   }
 
@@ -361,7 +361,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
       core::Error error;
       // asio error_code provided to ensure that no exception will be thrown.
       socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket_.close();
+      socket_.close(error.get());
       notified = true;
       condvar.notify_one();
     });
@@ -378,7 +378,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     auto bytes = asio::write(
         socket_, asio::buffer(message.data(), message.size()), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (bytes != message.size())
       throw core::Error::Write(
@@ -406,7 +406,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     std::lock_guard<std::mutex> lock(mutex);
     socket_.read_some(asio::buffer(buffer, core::BUFFER_SIZE), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (not std::string(buffer).size())
       throw core::Error::Read(
@@ -459,11 +459,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_send_handler(const std::string& message) {
-    auto self(shared_from_this());
+    auto roxanne(shared_from_this());
     asio::async_write(
         socket_, asio::buffer(message),
         service_.get_strand().wrap(
-            [this, self](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -483,11 +483,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_receive_handler() {
-    auto self(shared_from_this());
+    auto roxanne(shared_from_this());
     socket_.async_read_some(
         asio::buffer(buffer_, core::BUFFER_SIZE),
         service_.get_strand().wrap(
-            [this, self](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -643,12 +643,48 @@ class Client {
 
 class Server {
  public:
-  explicit Server() {}
+  explicit Server(const std::string& port)
+      : port_(port),
+        acceptor_(service_.get()),
+        session_(network::Stream::new_session(service_)) {
+    asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), std::stoi(port_));
+    acceptor_.open(endpoint.protocol());
+    acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+    acceptor_.bind(endpoint);
+    acceptor_.listen();
+    std::cout << "debug\n";
+  }
 
   Server(const Server&) = delete;
   Server& operator=(const Server&) = delete;
 
   ~Server() {}
+
+  void run(bool async) {
+
+    if (not async) {
+      core::Error error;
+
+      acceptor_.accept(session_->socket(), error.get());
+      if (error.exist()) error.throw_it();
+      accept_handler_(std::move(session_));
+      session_.reset();
+      session_ = network::Stream::new_session(service_);
+      return;
+    }
+  }
+
+  void set_accept_handler(
+    const std::function<void(network::Stream::session)>& callback) {
+      accept_handler_ = callback;
+  }
+
+ private:
+  std::string port_;
+  core::Service service_;
+  asio::ip::tcp::acceptor acceptor_;
+  network::Stream::session session_;
+  std::function<void(network::Stream::session)> accept_handler_;
 };
 
 }  // namespace tcp

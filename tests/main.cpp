@@ -473,6 +473,26 @@ SCENARIO("testing Stream session features and thread safety", "[network]") {
 //   }
 // }
 
+
+SCENARIO("testing tcp server behavior and thread safety", "[tcp]") {
+  GIVEN("TCP server listenning on port 9999") {
+    hermes::tcp::Server server("9999");
+
+    WHEN("testing iterative server") {
+
+      auto handler = [](Stream::session connection){
+        connection->send("ROXANNE\n");
+        std::cout << connection->receive() << std::endl;
+      };
+
+      server.set_accept_handler(handler);
+
+      for(int i = 0; i < 2; ++i)
+        server.run(false);
+    }
+  }
+}
+
 SCENARIO("testing hermes protobuf operations", "[protobuf]") {
   GIVEN("protobuf message") {
       com::Message message;
