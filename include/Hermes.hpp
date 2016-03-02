@@ -661,22 +661,41 @@ class Server {
   ~Server() {}
 
   void run(bool async) {
+    try {
+      if (not acceptor_.is_open())
+        throw core::Error::Connection(
+            "Unexpected error occured."
+            " Cannot open asio::ip::tcp::acceptor. Operation aborted.");
 
-    if (not async) {
-      core::Error error;
+      if (not async) {
+        core::Error error;
 
-      acceptor_.accept(session_->socket(), error.get());
-      if (error.exist()) error.throw_it();
-      accept_handler_(std::move(session_));
-      session_.reset();
-      session_ = network::Stream::new_session(service_);
-      return;
+        session_->service().run();
+        acceptor_.accept(session_->socket(), error.get());
+        if (error.exist()) error.throw_it();
+        accept_handler_(std::move(session_));
+        session_.reset();
+        session_ = network::Stream::new_session(service_);
+        return;
+
+      } else {
+        //
+        // Fix async_accept issues
+        //
+      }
+    } catch (std::exception& e) {
+      core::Error::print(e.what());
     }
   }
 
+  void stop() {
+    session_->disconnect();
+    service_.stop();
+  }
+
   void set_accept_handler(
-    const std::function<void(network::Stream::session)>& callback) {
-      accept_handler_ = callback;
+      const std::function<void(network::Stream::session)>& callback) {
+    accept_handler_ = callback;
   }
 
  private:

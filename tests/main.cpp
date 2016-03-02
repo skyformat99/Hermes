@@ -481,13 +481,27 @@ SCENARIO("testing tcp server behavior and thread safety", "[tcp]") {
     WHEN("testing iterative server") {
 
       auto handler = [](Stream::session connection){
+
+        auto send = [](std::size_t bytes, Stream& session){
+          std::cout << ">>> " << bytes << std::endl;
+        };
+
+        auto rcv = [](std::string r, Stream& session){
+          std::cout << "<<< " << r << std::endl;
+        };
+
+        connection->set_write_handler(send);
+        connection->set_read_handler(rcv);
+        connection->async_send("je t'aime\n");
         connection->send("ROXANNE\n");
+        connection->async_receive();
         std::cout << connection->receive() << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
       };
 
       server.set_accept_handler(handler);
 
-      for(int i = 0; i < 2; ++i)
+      for (int i = 0; i < 2; ++i)
         server.run(false);
     }
   }

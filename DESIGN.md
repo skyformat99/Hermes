@@ -24,7 +24,18 @@ Note: JSON is not handled by default, because all famous library has a to_string
 ## Network softwares
 
 
-coming soon.
+Hermes provides various network softwares. The library offers to the user an easy way
+to create network entity supporting either TCP or UDP.
+The following examples will show you how to use the different classes implemented into
+Hermes.
+I will split examples respectively into a section TCP and a section UDP. Both of them
+have commented code example for the two sides: client and server.
+
+
+#### TCP
+
+
+#### UDP
 
 
 

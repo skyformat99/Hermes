@@ -42,7 +42,7 @@ The following libraries are required to use all Hermes' features but they are in
 - Google Protocol Buffers
 - Google FlatBuffers
 
-/!\ install libraries before using Hermes.
+> **WARNING**: you must install libraries before using Hermes.
 
 ## Compiling
 Hermes is a header only library, so there is nothing to build and to link with your program.
