@@ -254,7 +254,7 @@ class Error {
 *  Both of those wrappers need a Service object to be able to to call the I/O
 *  services of your operating system.
 *
-*  @require: Hermes::core
+*  @require: hermes::core
 *
 */
 namespace network {
@@ -534,8 +534,8 @@ class Stream : public std::enable_shared_from_this<Stream> {
 *will find
 *  usages examples in the documentation.
 *
-*  @require: Hermes::core
-*            Hermes::network::Stream
+*  @require: hermes::core
+*            hermes::network::Stream
 *
 */
 namespace tcp {
@@ -691,20 +691,20 @@ class Client {
 };
 
 /**
-* @brief: TCP server
+*   @brief: TCP server
 *
+*   @param:
+*     - port to listen on (string)
 *
-*
-*
-*
-*
-*
+*   @link:
+*    https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md*
 */
 class Server {
  public:
   // Ctor
   explicit Server(const std::string& port)
       : port_(port),
+        strand_(service_.get()),
         acceptor_(service_.get()),
         session_(network::Stream::new_session(service_)),
         accept_handler_(nullptr) {
@@ -723,6 +723,20 @@ class Server {
   // Dtor
   ~Server() noexcept { stop(); }
 
+  // run the server
+  //
+  // @param:
+  //    - bool async
+  //
+  // If you run the server with 'false' as parameter, you will run an iterative
+  // server, it means that you could handle only one connection at a time.
+  // Otherwise, run the server with 'true' to be able to handle many connections
+  // asynchronously.
+  //
+  // NOTE: you have to set the accept handler before calling the 'run' method.
+  //       this handler represents the behavior of your server when it accepts
+  //       a new connection.
+  //
   void run(bool async) {
     try {
       if (not acceptor_.is_open())
@@ -742,30 +756,72 @@ class Server {
         return;
 
       } else {
-        //
-        // Fix async_accept issues
-        //
+        // in the case where the run method is called with true as parameter
+        // we post through the server strand object a handler which contains
+        // the async accept. This handler is posted through the strand object to
+        // ensure that there will be at least one connection accepted.
+        strand_.post(std::bind(&Server::handler, this));
       }
     } catch (std::exception& e) {
       core::Error::print(e.what());
     }
   }
 
+  // stops the server
   void stop() {
     session_->disconnect();
     service_.stop();
   }
 
+  // set the accept handler.
+  // this handler represents the server's behavior when it accepts a new
+  // connection.
   void set_accept_handler(
       const std::function<void(network::Stream::session)>& callback) {
     accept_handler_ = callback;
   }
 
  private:
+  // Performs the async accept.
+  // once the socket accepted and the connection made, the session_ is moved to
+  // the accept handler. As this is a shared_ptr, the connection will remain
+  // until
+  // there is operation on it. Then we reset the session_ and call again the
+  // handler
+  // method to accept a new connection.
+  void handler() {
+    acceptor_.async_accept(
+        session_->socket(), session_->service().get_strand().wrap([this](
+                                const asio::error_code& error) {
+
+          if (error) throw asio::system_error(error);
+
+          // This part is scope locked and a mutex is used to
+          // ensure the thread safety and avoid concurrencies issues of the
+          // accept handler.
+          std::mutex mutex;
+          std::lock_guard<std::mutex> lock(mutex);
+          {
+            if (accept_handler_) accept_handler_(std::move(session_));
+            session_.reset();
+            session_ = network::Stream::new_session(service_);
+          }
+          // we call the function itself to accept a new connection.
+          handler();
+        }));
+  }
+
+  // The port to which the server is listenning on.
   std::string port_;
+  // I/O services.
   core::Service service_;
+  // Dedicated strand object of the server.
+  asio::io_context::strand strand_;
+  // Acceptor, the Asio facilitator to accept socket and enable tcp connection.
   asio::ip::tcp::acceptor acceptor_;
+  // A connection to a client
   network::Stream::session session_;
+  // The handler involed when the asynchronous accept is performed.
   std::function<void(network::Stream::session)> accept_handler_;
 };
 

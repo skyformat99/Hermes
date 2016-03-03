@@ -140,16 +140,78 @@ network softwares.
 
 - Server
 
-  comming soon.
-
 
 ```c++
 
     #include "Hermes.hpp"
 
+
+    //
+    // First let's see an iterative server.
+    // By this, i mean a server which can handle only one connection at a time.
+    //
+
+    // TCP Server
+    hermes::tcp::Server server("50501");
+
+
+    // Before using the server, you have to define its behavior when it will accept
+    // a new connection. In order to that, we define a lambda with the according parameter.
+    auto accept_handler = [](hermes::network::Stream::session connection) {
+        // You could decide that your server will send data or wait for data
+        // at the connection.
+
+        // E.g: I want my server waiting for data when it accepts a new connection.
+        std::string received = connection->receive();
+        std::cout << received << std::endl;
+
+        // or i want to send data to the client at its connection
+        connection->send("you are connected to my server :)");
+    };
+
+    // once the accept handler is defined, we pass it to our server
+    server.set_accept_handler(accept_handler);
+
+    // Now we can run our server :)
+    for (;;)
+      server.run(false);
+
+
+    // We have seen how to use the TCP server to have an iterative one, but what we
+    // are really looking for is a server which is able to handle many
+    // connections asynchronously! So let's write such a server.
+
+
+    // once again we have to define the behavior of our server when it will
+    // accept a new connection.
+    // However this time, we will use asynchronous operations into the accept handler.
+    auto accept_handler = [](hermes::network::Stream::session connection) {
+
+        // E.g: I want my server waiting for data when it accepts a new connection.
+
+        // the handler for the async receive operation.
+        auto receive_handler = [](std::string received, hermes::network::Stream& session) {
+          std::cout << "received: " << received << std::endl;
+        };
+
+        // we set the receive handler.
+        connection->set_receive_handler(receive_handler);
+        // we ask to an asynchronous receive.
+        connection->async_receive();
+    };
+
+    // once the accept handler is defined, we pass it to our server.
+    server.set_accept_handler(accept_handler);
+
+    // Now we can run our server :)
+    server.run(true);
+
 ```
 
 #### UDP
+
+- coming soon.
+
 
 
 
