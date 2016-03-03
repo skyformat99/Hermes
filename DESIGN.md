@@ -1,20 +1,29 @@
 # Hermes design
 
-In this document, we will define each feature of Hermes.
-We will describe how to use it. Let's begin with an overview of Hermes core functionalities.
+In this document, we will define each feature of Hermes. We will describe how to
+use it. Let's begin with an overview of Hermes core functionalities.
 
-Hermes has three different parts:
+Hermes has three parts:
+
 - Network softwares:
-    coming soon.
+
+    The purpose of Hermes is to provide to his user a simple c++ library supporting
+    TCP/UDP protocol, and helping the user to create and use those network softwares.
+    Hermes owns two dedicated namespaces to permit his user to construct client
+    and server following TCP or UDP protocol.
 
 - Serialization:
-    Hermes is a, fast and easy, way to send and receive serialized data through a socket.
-    Thanks to Google Protocol Buffers and FlatBuffers, Hermes could send/receive serialized
-    data.
 
-Note: JSON is not handled by default, because all famous library has a to_string() method.
+    Hermes is a, fast and easy, way to send and receive serialized data through
+    a socket. Thanks to Google Protocol Buffers and FlatBuffers, Hermes could
+    send/receive serialized data.
+
+Note: JSON is not handled by default because all famous library
+      has a to_string() method.
+
 
 - Modules:
+
     Hermes is split into modules, you do not have to use all features if you do not want to.
     That's why, you will find them into the repository include/modules.
 
@@ -23,17 +32,122 @@ Note: JSON is not handled by default, because all famous library has a to_string
 
 ## Network softwares
 
-
-Hermes provides various network softwares. The library offers to the user an easy way
-to create network entity supporting either TCP or UDP.
-The following examples will show you how to use the different classes implemented into
-Hermes.
-I will split examples respectively into a section TCP and a section UDP. Both of them
-have commented code example for the two sides: client and server.
+Below, you will find usages examples to show you how to create and use Hermes
+network softwares.
 
 
 #### TCP
 
+
+- Client
+
+
+```c++
+
+  #include "Hermes.hpp"
+
+  //
+  // First let's see the synchronous way
+  //
+
+  // TCP Client
+  hermes::tcp::Client client("127.0.0.1", "50501");
+
+
+  // connecting the client to the given remote (host:port)
+  client.connect();
+
+  // send data to the server
+  std::size_t bytes = client.send("here a message from my client :)");
+
+
+  // waiting for data
+  // this is a blocking function. It means that your program
+  // will be stuck until there is at least one byte received.
+  std::string received = client.receive();
+
+
+  // disconnecting your client
+  client.disconnect();
+
+  // NOTE: disconnect method is automatically called in the client destructor
+  //       if this one is still connected when the object is about to be destroyed.
+
+
+
+  //
+  // Now, let's have a look to the asynchronous side.
+  //
+
+
+  // asynchronous connection
+  //
+  //  @param:
+  //    - callback
+  //
+  //  A callback could be provided and it will be invoked when the asynchronous
+  //  connection will be completed.
+
+  client.async_connect(); // no callback provided.
+
+  // here we pass a lambda as callback to the async_connect method.
+  // it will be invoked and executed once the asynchronous connection is performed.
+  client.async_connect([](hermes::network::Stream& session){
+
+    // do some stuff at the connection.
+    // you could decide to do operations at the connection.
+    // To do that use the session (param) as you used your client.
+
+    // e.g: i want to send and receive data once my client is connected:
+    session.send("data");
+    std::cout << session.receive() << std::endl;
+  });
+
+
+  // For the following functions, you will need to set handlers before using them.
+  // I explain myself, as you should know asynchronous operation means that the operation
+  // wont be performed when you call it. So we generally use a handler that we pass to our
+  // asynchronous operation and it is invoked when the operation is performed.
+
+
+  // asynchronous send
+
+  auto send_handler = [](std::size_t bytes, /*number of bytes send*/
+                         hermes::network::Stream& session/*the current connection*/){
+     // do some stuff.
+  };
+
+
+  client.set_send_handler(send_handler);
+  client.async_send("here a message from my client :).");
+
+  // same for the async receive function
+
+  auto receive_handler = [](std::string received, /*the data received*/
+                         hermes::network::Stream& session/*the current connection*/){
+     // do some stuff.
+  };
+
+
+  client.set_receive_handler(receive_handler);
+  client.async_receive();
+
+
+  // disconnection
+  client.disconnect();
+```
+
+
+- Server
+
+  comming soon.
+
+
+```c++
+
+    #include "Hermes.hpp"
+
+```
 
 #### UDP
 
@@ -64,7 +178,7 @@ One more thing, as you should know, using protobuf involves to having defined a 
 ```c++
   #include "Hermes.hpp"
 
-  using namespace Hermes::protobuf;
+  using namespace hermes::protobuf;
 
   // Synchronous operations
   template <typename T>
@@ -88,17 +202,15 @@ One more thing, as you should know, using protobuf involves to having defined a 
 
 ```
 
-##### Desgign - Examples
+##### Design - Examples
 
 - Example 1: Synchronous send/receive operations.
 
 ```c++
   #include "Hermes.hpp"
+  // you have to include the generated header of the protobuf class
 
-  #include <string
-  #include <iostream>
-
-  using namespace Hermes;
+  using namespace hermes;
 
   package::message message;
 
@@ -127,11 +239,9 @@ One more thing, as you should know, using protobuf involves to having defined a 
 
 ```c++
   #include "Hermes.hpp"
+  // you have to include the generated header of the protobuf class
 
-  #include <string>
-  #include <iostream>
-
-  using namespace Hermes;
+  using namespace hermes;
 
   package::message message;
 
@@ -164,10 +274,16 @@ Take a look to the protobuf tests, it may be usefull:
 [`protobuf test`](https://github.com/TommyStarK/Hermes/blob/master/tests/protobuff.cpp).
 
 
+
+
+
 #### flatbuffers
 
 
 coming soon.
+
+
+
 
 
 
@@ -177,10 +293,15 @@ coming soon.
   In the repository include/modules, you will find the following modules:
 
   - Hermes_protobuf.hpp
+  - Hermes_tcp_client.hpp
   - more soon.
+
+
 
  A module works as Hermes. The modules are headers only so, you just have to
   include the desired one to use it.
+
+
 
   ```c++
     // For example, i just want to use the Hermes protobuf operations.
@@ -188,4 +309,4 @@ coming soon.
   ```
 
 
-Note: All modules are in the namespace 'Hermes'.
+Note: All modules are in the namespace 'hermes'.

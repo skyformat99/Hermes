@@ -17,20 +17,20 @@
 
 namespace hermes {
 
+
 /**
 *   @brief: Hermes core functionalities
 *
 *   @description: core namespace contains various classes to provide basic
 *   features such as I/O services or errors handling.
 *
-*
-*
 */
 namespace core {
 
-// Size used for buffers to receive response.
+// Size used for buffers.
 // Modify the value if you need a bigger size.
 static unsigned int const BUFFER_SIZE = 2048;
+
 
 /**
 *  @brief: Your program's link to your operating system I/O services.
@@ -142,6 +142,7 @@ class Service {
   std::unique_ptr<asio::io_context::work> work_;
 };
 
+
 /**
 *  @brief: Errors handling class
 *
@@ -167,11 +168,11 @@ class Error {
 
   asio::error_code& get() { return error_; }
 
-  static void print(const std::string& msg) { std::cerr << msg << std::endl; }
+  bool exist() { return error_ ? true : false; }
 
-  static void throw_asio_error(asio::error_code& error) {
-    throw asio::system_error(error);
-  }
+  void throw_it() { throw asio::system_error(error_); }
+
+  static void print(const std::string& err) { std::cerr << err << std::endl; }
 
   // logic errors handler
   class User : public std::logic_error {
@@ -244,6 +245,7 @@ class Error {
 
 }  // namespace core
 
+
 /**
 *  @brief: Hermes network functionalities
 *
@@ -290,7 +292,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     core::Error error;
 
     socket_.connect(endpoint, error.get());
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
     connected_ = true;
   }
 
@@ -361,7 +363,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
       core::Error error;
       // asio error_code provided to ensure that no exception will be thrown.
       socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket_.close();
+      socket_.close(error.get());
       notified = true;
       condvar.notify_one();
     });
@@ -378,7 +380,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     auto bytes = asio::write(
         socket_, asio::buffer(message.data(), message.size()), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (bytes != message.size())
       throw core::Error::Write(
@@ -406,7 +408,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     std::lock_guard<std::mutex> lock(mutex);
     socket_.read_some(asio::buffer(buffer, core::BUFFER_SIZE), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (not std::string(buffer).size())
       throw core::Error::Read(
@@ -459,10 +461,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_send_handler(const std::string& message) {
+    auto roxanne(shared_from_this());
     asio::async_write(
         socket_, asio::buffer(message),
         service_.get_strand().wrap(
-            [this](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -474,7 +477,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
               // lock the execution of the handler to guarantee the thread
               // safety.
               std::lock_guard<std::mutex> lock(mutex);
-              if (write_handler_) write_handler_(bytes, *this);
+              if (write_handler_) write_handler_(bytes, *shared_from_this());
             }));
   }
 
@@ -482,10 +485,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_receive_handler() {
+    auto roxanne(shared_from_this());
     socket_.async_read_some(
         asio::buffer(buffer_, core::BUFFER_SIZE),
         service_.get_strand().wrap(
-            [this](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -497,7 +501,8 @@ class Stream : public std::enable_shared_from_this<Stream> {
               std::lock_guard<std::mutex> lock(mutex);
               // lock the execution of the handler to guarantee the thread
               // safety.
-              if (read_handler_) read_handler_(std::string(buffer_), *this);
+              if (read_handler_)
+                read_handler_(std::string(buffer_), *shared_from_this());
               std::memset(buffer_, 0, core::BUFFER_SIZE);
             }));
   }
@@ -523,17 +528,29 @@ class Stream : public std::enable_shared_from_this<Stream> {
 
 }  // namespace network
 
+
+/**
+*   @brief: Hermes protobuf operations.
+*
+*
+*   @description: The protobuf namespace contains the Hermes operations about
+*   sending/receiving serialized data through socket using the Google protocols
+*   Buffers serialization protocol. Those operations use TCP protocol.
+*
+*   @require: Hermes::core
+*             Hermes::network::Stream
+*
+*/
 namespace protobuf {
 
+// synchronous send of a serialized protobuf message
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  const T& message) {
   core::Service service;
-
-  auto session = network::Stream::new_session(service);
-
   std::size_t bytes = 0;
   std::string protobuf("");
+  auto session = network::Stream::new_session(service);
 
   try {
     session->service().run();
@@ -548,8 +565,11 @@ std::size_t send(const std::string& host, const std::string& port,
   return bytes;
 }
 
+// synchronous receive of a protobuf message
+// message is constructed from a serialized string.
 template <typename T>
 T receive(const std::string& port) {
+  T result;
   core::Service service;
   std::string received("");
   auto session = network::Stream::new_session(service);
@@ -561,15 +581,16 @@ T receive(const std::string& port) {
     acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor.accept(session->socket());
     received = session->receive();
+    result.ParseFromString(received);
   } catch (std::exception& e) {
     core::Error::print(e.what());
   }
-
-  T result;
-  result.ParseFromString(received);
   return result;
 }
 
+// asynchronous send of a serialized protobuf message
+// a callback could be provided like a std::function or a lambda, as parameter.
+// the callback will be invoked when the asynchronous send will be performed.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 const T& message,
@@ -577,8 +598,8 @@ void async_send(const std::string& host, const std::string& port,
   core::Service service;
   std::string protobuf("");
   auto session = network::Stream::new_session(service);
-  auto handler = [callback] (std::size_t bytes, network::Stream& session) {
-    callback(bytes);
+  auto handler = [callback](std::size_t bytes, network::Stream& session) {
+    if (callback) callback(bytes);
   };
 
   try {
@@ -595,6 +616,9 @@ void async_send(const std::string& host, const std::string& port,
   }
 }
 
+// asynchronous receive of a serialized protobuf message
+// a callback could be provided like a std::function or a lambda, as parameter.
+// the callback will be invoked when the asynchronous receive will be performed.
 template <typename T>
 void async_receive(const std::string& port,
                    const std::function<void(T)>& callback = nullptr) {
@@ -604,7 +628,7 @@ void async_receive(const std::string& port,
   auto handler = [callback](std::string received, hermes::network::Stream& s) {
     T result;
     result.ParseFromString(received);
-    callback(result);
+    if (callback) callback(result);
   };
 
   try {
@@ -614,20 +638,19 @@ void async_receive(const std::string& port,
     acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor.bind(endpoint);
     acceptor.listen();
-    acceptor.async_accept(
-      session->socket(),
-      [&](const asio::error_code& error) {
-        if (error) throw asio::system_error(error);
-        session->set_read_handler(handler);
-        session->async_receive();
-    });
+    acceptor.async_accept(session->socket(),
+                          [&](const asio::error_code& error) {
+                            if (error) throw asio::system_error(error);
+                            session->set_read_handler(handler);
+                            session->async_receive();
+                          });
     session->disconnect();
     session->service().stop();
-  } catch(std::exception& e) {
+  } catch (std::exception& e) {
     core::Error::print(e.what());
   }
 }
 
-} // namespace protobuf
+}  // namespace protobuf
 
 }  // namespace hermes

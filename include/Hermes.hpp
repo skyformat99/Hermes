@@ -23,12 +23,10 @@ namespace hermes {
 *   @description: core namespace contains various classes to provide basic
 *   features such as I/O services or errors handling.
 *
-*
-*
 */
 namespace core {
 
-// Size used for buffers to receive response.
+// Size used for buffers.
 // Modify the value if you need a bigger size.
 static unsigned int const BUFFER_SIZE = 2048;
 
@@ -526,20 +524,49 @@ class Stream : public std::enable_shared_from_this<Stream> {
 
 }  // namespace network
 
+/**
+*  @brief: The tcp namespace contains a Client and a Server class. It is the top
+*  level of users' interaction with hermes. By this, i mean that the user who
+*wants
+*  a network software following the TCP protocol will use this dedicated
+*namespace.
+*  The client and the server have been designed to be very simple to use, you
+*will find
+*  usages examples in the documentation.
+*
+*  @require: Hermes::core
+*            Hermes::network::Stream
+*
+*/
 namespace tcp {
 
+/**
+* @brief: TCP Client Class
+*
+* @param:
+*     - host (string)
+*     - port (string)
+*
+* @link:
+*   https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*/
 class Client {
  public:
+  // Ctor
   explicit Client(const std::string& host, const std::string& port)
       : host_(host),
         port_(port),
         session_(network::Stream::new_session(service_)) {}
 
+  // Copy Ctor
   Client(const Client&) = delete;
+  // Assignment operator
   Client& operator=(const Client&) = delete;
 
+  // Dtor
   ~Client() noexcept { disconnect(); }
 
+  // performs a synchronous connection
   void connect() {
     try {
       if (is_connected()) throw core::Error::User("Client Already connected.");
@@ -552,6 +579,13 @@ class Client {
     }
   }
 
+  // performs an asynchronous connection
+  //
+  //  @param:
+  //    - callback
+  //
+  //  A callback could be provided and it will be invoked when the asynchronous
+  //  connection will be completed.
   void async_connect(
       const std::function<void(network::Stream&)>& callback = nullptr) {
     try {
@@ -565,6 +599,7 @@ class Client {
     }
   }
 
+  // disconnect the client by stopping the service and closing the session
   void disconnect() {
     if (is_connected()) {
       session_->disconnect();
@@ -572,6 +607,7 @@ class Client {
     }
   }
 
+  // synchronous sending of data
   std::size_t send(const std::string& message) {
     std::size_t bytes = 0;
 
@@ -586,6 +622,7 @@ class Client {
     return bytes;
   }
 
+  // asynchronous sending of data
   void async_send(const std::string& message) {
     try {
       if (not is_connected())
@@ -597,6 +634,7 @@ class Client {
     }
   }
 
+  // synchronous receive
   std::string receive() {
     std::string received("");
 
@@ -611,6 +649,7 @@ class Client {
     return received;
   }
 
+  // asynchronous receive
   void async_receive() {
     try {
       if (not is_connected())
@@ -622,43 +661,67 @@ class Client {
     }
   }
 
+  // set the handler which will be invoked when the asynchronous send operation
+  //  will be performed.
   void set_send_handler(
       const std::function<void(std::size_t, network::Stream&)>& callback) {
     session_->set_write_handler(callback);
   }
 
+  // set the handler which will be invoked when the asynchronous receive
+  // operation
+  //  will be performed.
   void set_receive_handler(
       const std::function<void(std::string, network::Stream&)>& callback) {
     session_->set_read_handler(callback);
   }
 
+  // returns true whether the client is connected, false otherwise.
   bool is_connected() { return session_->is_connected(); }
 
  private:
+  // the host to wich the client is connected.
   std::string host_;
+  // the port used to connect to the given host.
   std::string port_;
+  // I/O services.
   core::Service service_;
+  // The connection to the host.
   network::Stream::session session_;
 };
 
+/**
+* @brief: TCP server
+*
+*
+*
+*
+*
+*
+*
+*/
 class Server {
  public:
+  // Ctor
   explicit Server(const std::string& port)
       : port_(port),
         acceptor_(service_.get()),
-        session_(network::Stream::new_session(service_)) {
+        session_(network::Stream::new_session(service_)),
+        accept_handler_(nullptr) {
     asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), std::stoi(port_));
     acceptor_.open(endpoint.protocol());
     acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor_.bind(endpoint);
     acceptor_.listen();
-    std::cout << "debug\n";
   }
 
+  // Copy Ctor
   Server(const Server&) = delete;
+  // Assignment operator
   Server& operator=(const Server&) = delete;
 
-  ~Server() {}
+  // Dtor
+  ~Server() noexcept { stop(); }
 
   void run(bool async) {
     try {
@@ -673,7 +736,7 @@ class Server {
         session_->service().run();
         acceptor_.accept(session_->socket(), error.get());
         if (error.exist()) error.throw_it();
-        accept_handler_(std::move(session_));
+        if (accept_handler_) accept_handler_(std::move(session_));
         session_.reset();
         session_ = network::Stream::new_session(service_);
         return;
@@ -708,17 +771,28 @@ class Server {
 
 }  // namespace tcp
 
+/**
+*   @brief: Hermes protobuf operations.
+*
+*
+*   @description: The protobuf namespace contains the Hermes operations about
+*   sending/receiving serialized data through socket using the Google protocols
+*   Buffers serialization protocol. Those operations use TCP protocol.
+*
+*   @require: Hermes::core
+*             Hermes::network::Stream
+*
+*/
 namespace protobuf {
 
+// synchronous send of a serialized protobuf message
 template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  const T& message) {
   core::Service service;
-
-  auto session = network::Stream::new_session(service);
-
   std::size_t bytes = 0;
   std::string protobuf("");
+  auto session = network::Stream::new_session(service);
 
   try {
     session->service().run();
@@ -733,8 +807,11 @@ std::size_t send(const std::string& host, const std::string& port,
   return bytes;
 }
 
+// synchronous receive of a protobuf message
+// message is constructed from a serialized string.
 template <typename T>
 T receive(const std::string& port) {
+  T result;
   core::Service service;
   std::string received("");
   auto session = network::Stream::new_session(service);
@@ -746,15 +823,16 @@ T receive(const std::string& port) {
     acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor.accept(session->socket());
     received = session->receive();
+    result.ParseFromString(received);
   } catch (std::exception& e) {
     core::Error::print(e.what());
   }
-
-  T result;
-  result.ParseFromString(received);
   return result;
 }
 
+// asynchronous send of a serialized protobuf message
+// a callback could be provided like a std::function or a lambda, as parameter.
+// the callback will be invoked when the asynchronous send will be performed.
 template <typename T>
 void async_send(const std::string& host, const std::string& port,
                 const T& message,
@@ -763,7 +841,7 @@ void async_send(const std::string& host, const std::string& port,
   std::string protobuf("");
   auto session = network::Stream::new_session(service);
   auto handler = [callback](std::size_t bytes, network::Stream& session) {
-    callback(bytes);
+    if (callback) callback(bytes);
   };
 
   try {
@@ -780,6 +858,9 @@ void async_send(const std::string& host, const std::string& port,
   }
 }
 
+// asynchronous receive of a serialized protobuf message
+// a callback could be provided like a std::function or a lambda, as parameter.
+// the callback will be invoked when the asynchronous receive will be performed.
 template <typename T>
 void async_receive(const std::string& port,
                    const std::function<void(T)>& callback = nullptr) {
@@ -789,7 +870,7 @@ void async_receive(const std::string& port,
   auto handler = [callback](std::string received, hermes::network::Stream& s) {
     T result;
     result.ParseFromString(received);
-    callback(result);
+    if (callback) callback(result);
   };
 
   try {

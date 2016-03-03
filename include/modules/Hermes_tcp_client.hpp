@@ -13,9 +13,9 @@
 #include <condition_variable>
 
 #include "asio.hpp"
-#include "google/protobuf/message.h"
 
 namespace hermes {
+
 
 /**
 *   @brief: Hermes core functionalities
@@ -23,14 +23,13 @@ namespace hermes {
 *   @description: core namespace contains various classes to provide basic
 *   features such as I/O services or errors handling.
 *
-*
-*
 */
 namespace core {
 
-// Size used for buffers to receive response.
+// Size used for buffers.
 // Modify the value if you need a bigger size.
 static unsigned int const BUFFER_SIZE = 2048;
+
 
 /**
 *  @brief: Your program's link to your operating system I/O services.
@@ -142,6 +141,7 @@ class Service {
   std::unique_ptr<asio::io_context::work> work_;
 };
 
+
 /**
 *  @brief: Errors handling class
 *
@@ -167,11 +167,11 @@ class Error {
 
   asio::error_code& get() { return error_; }
 
-  static void print(const std::string& msg) { std::cerr << msg << std::endl; }
+  bool exist() { return error_ ? true : false; }
 
-  static void throw_asio_error(asio::error_code& error) {
-    throw asio::system_error(error);
-  }
+  void throw_it() { throw asio::system_error(error_); }
+
+  static void print(const std::string& err) { std::cerr << err << std::endl; }
 
   // logic errors handler
   class User : public std::logic_error {
@@ -244,6 +244,7 @@ class Error {
 
 }  // namespace core
 
+
 /**
 *  @brief: Hermes network functionalities
 *
@@ -290,7 +291,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     core::Error error;
 
     socket_.connect(endpoint, error.get());
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
     connected_ = true;
   }
 
@@ -361,7 +362,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
       core::Error error;
       // asio error_code provided to ensure that no exception will be thrown.
       socket_.shutdown(asio::ip::tcp::socket::shutdown_both);
-      socket_.close();
+      socket_.close(error.get());
       notified = true;
       condvar.notify_one();
     });
@@ -378,7 +379,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     auto bytes = asio::write(
         socket_, asio::buffer(message.data(), message.size()), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (bytes != message.size())
       throw core::Error::Write(
@@ -406,7 +407,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
     std::lock_guard<std::mutex> lock(mutex);
     socket_.read_some(asio::buffer(buffer, core::BUFFER_SIZE), error.get());
 
-    if (error.get()) core::Error::throw_asio_error(error.get());
+    if (error.exist()) error.throw_it();
 
     if (not std::string(buffer).size())
       throw core::Error::Read(
@@ -459,10 +460,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_send_handler(const std::string& message) {
+    auto roxanne(shared_from_this());
     asio::async_write(
         socket_, asio::buffer(message),
         service_.get_strand().wrap(
-            [this](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -474,7 +476,7 @@ class Stream : public std::enable_shared_from_this<Stream> {
               // lock the execution of the handler to guarantee the thread
               // safety.
               std::lock_guard<std::mutex> lock(mutex);
-              if (write_handler_) write_handler_(bytes, *this);
+              if (write_handler_) write_handler_(bytes, *shared_from_this());
             }));
   }
 
@@ -482,10 +484,11 @@ class Stream : public std::enable_shared_from_this<Stream> {
   // this function is post through the strand object to ensure that it
   // will be invoked once and at the good moment.
   void async_receive_handler() {
+    auto roxanne(shared_from_this());
     socket_.async_read_some(
         asio::buffer(buffer_, core::BUFFER_SIZE),
         service_.get_strand().wrap(
-            [this](const asio::error_code& error, std::size_t bytes) {
+            [this, roxanne](const asio::error_code& error, std::size_t bytes) {
 
               if (error) throw asio::system_error(error);
 
@@ -497,7 +500,8 @@ class Stream : public std::enable_shared_from_this<Stream> {
               std::lock_guard<std::mutex> lock(mutex);
               // lock the execution of the handler to guarantee the thread
               // safety.
-              if (read_handler_) read_handler_(std::string(buffer_), *this);
+              if (read_handler_)
+                read_handler_(std::string(buffer_), *shared_from_this());
               std::memset(buffer_, 0, core::BUFFER_SIZE);
             }));
   }
@@ -523,46 +527,80 @@ class Stream : public std::enable_shared_from_this<Stream> {
 
 }  // namespace network
 
+
+/**
+*  @brief: The tcp namespace contains a Client and a Server class. It is the top
+*  level of users' interaction with hermes. By this, i mean that the user who wants
+*  a network software following the TCP protocol will use this dedicated namespace.
+*  The client and the server have been designed to be very simple to use, you will find
+*  usages examples in the documentation.
+*
+*  @require: Hermes::core
+*            Hermes::network::Stream
+*
+*/
 namespace tcp {
 
+/**
+* @brief: TCP Client Class
+*
+* @param:
+*     - host (string)
+*     - port (string)
+*
+* @link:
+*   https://github.com/TommyStarK/Hermes/blob/master/DESIGN.md
+*/
 class Client {
  public:
+  // Ctor
   explicit Client(const std::string& host, const std::string& port)
       : host_(host),
         port_(port),
         session_(network::Stream::new_session(service_)) {}
 
+  // Copy Ctor
   Client(const Client&) = delete;
+  // Assignment operator
   Client& operator=(const Client&) = delete;
 
+  // Dtor
   ~Client() noexcept { disconnect(); }
 
+  // performs a synchronous connection
   void connect() {
     try {
       if (is_connected()) throw core::Error::User("Client Already connected.");
       session_->service().run();
       asio::ip::tcp::resolver resolver(service_.get());
-      asio::ip::tcp::resolver::query query(host_, port_);
-      endpoint_ = *resolver.resolve(query);
-      session_->connect(endpoint_);
+      session_->connect(
+          *resolver.resolve(asio::ip::tcp::resolver::query(host_, port_)));
     } catch (std::exception& e) {
       core::Error::print(e.what());
     }
   }
 
+  // performs an asynchronous connection
+  //
+  //  @param:
+  //    - callback
+  //
+  //  A callback could be provided and it will be invoked when the asynchronous
+  //  connection will be completed.
   void async_connect(
       const std::function<void(network::Stream&)>& callback = nullptr) {
     try {
       if (is_connected()) throw core::Error::User("Client Already connected.");
       asio::ip::tcp::resolver resolver(service_.get());
-      asio::ip::tcp::resolver::query query(host_, port_);
-      endpoint_ = *resolver.resolve(query);
-      session_->async_connect(endpoint_, callback);
+      session_->async_connect(
+          *resolver.resolve(asio::ip::tcp::resolver::query(host_, port_)),
+          callback);
     } catch (std::exception& e) {
       core::Error::print(e.what());
     }
   }
 
+  // disconnect the client by stopping the service and closing the session
   void disconnect() {
     if (is_connected()) {
       session_->disconnect();
@@ -570,6 +608,7 @@ class Client {
     }
   }
 
+  // synchronous sending of data
   std::size_t send(const std::string& message) {
     std::size_t bytes = 0;
 
@@ -584,6 +623,7 @@ class Client {
     return bytes;
   }
 
+  // asynchronous sending of data
   void async_send(const std::string& message) {
     try {
       if (not is_connected())
@@ -595,6 +635,7 @@ class Client {
     }
   }
 
+  // synchronous receive
   std::string receive() {
     std::string received("");
 
@@ -609,6 +650,7 @@ class Client {
     return received;
   }
 
+  // asynchronous receive
   void async_receive() {
     try {
       if (not is_connected())
@@ -620,25 +662,34 @@ class Client {
     }
   }
 
+  // set the handler which will be invoked when the asynchronous send operation
+  //  will be performed.
   void set_send_handler(
       const std::function<void(std::size_t, network::Stream&)>& callback) {
     session_->set_write_handler(callback);
   }
 
+  // set the handler which will be invoked when the asynchronous receive operation
+  //  will be performed.
   void set_receive_handler(
       const std::function<void(std::string, network::Stream&)>& callback) {
     session_->set_read_handler(callback);
   }
 
+  // returns true whether the client is connected, false otherwise.
   bool is_connected() { return session_->is_connected(); }
 
  private:
+  // the host to wich the client is connected.
   std::string host_;
+  // the port used to connect to the given host.
   std::string port_;
+  // I/O services.
   core::Service service_;
+  // The connection to the host.
   network::Stream::session session_;
-  asio::ip::tcp::endpoint endpoint_;
 };
-} // namespace tcp
+
+}  // namespace tcp
 
 }  // namespace hermes
