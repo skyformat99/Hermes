@@ -195,7 +195,7 @@ network softwares.
         };
 
         // we set the receive handler.
-        connection->set_receive_handler(receive_handler);
+        connection->set_read_handler(receive_handler);
         // we ask to an asynchronous receive.
         connection->async_receive();
     };

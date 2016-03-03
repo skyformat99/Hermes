@@ -780,7 +780,7 @@ class Server {
 
  private:
   // Performs the async accept.
-  // once the socket accepted and the connection made, the session_ is moved to
+  // once the socket is accepted and the connection made, the session_ is moved to
   // the accept handler. As this is a shared_ptr, the connection will remain
   // until there is operation on it. Then we reset the session_ and call again
   // the handler method to accept a new connection.
@@ -810,13 +810,13 @@ class Server {
   std::string port_;
   // I/O services.
   core::Service service_;
-  // Dedicated strand object of the server.
+  // Dedicated strand object for the server.
   asio::io_context::strand strand_;
   // Acceptor, the Asio facilitator to accept socket and enable tcp connection.
   asio::ip::tcp::acceptor acceptor_;
   // A connection to a client
   network::Stream::session session_;
-  // The handler involed when the asynchronous accept is performed.
+  // The handler invoked when the asynchronous accept is performed.
   std::function<void(network::Stream::session)> accept_handler_;
 };
 
