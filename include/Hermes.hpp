@@ -527,12 +527,9 @@ class Stream : public std::enable_shared_from_this<Stream> {
 /**
 *  @brief: The tcp namespace contains a Client and a Server class. It is the top
 *  level of users' interaction with hermes. By this, i mean that the user who
-*wants
-*  a network software following the TCP protocol will use this dedicated
-*namespace.
-*  The client and the server have been designed to be very simple to use, you
-*will find
-*  usages examples in the documentation.
+*  wants a network software following the TCP protocol will use this dedicated
+*  namespace. The client and the server have been designed to be very simple to
+*  use, you will find usages examples in the documentation.
 *
 *  @require: hermes::core
 *            hermes::network::Stream
@@ -785,10 +782,8 @@ class Server {
   // Performs the async accept.
   // once the socket accepted and the connection made, the session_ is moved to
   // the accept handler. As this is a shared_ptr, the connection will remain
-  // until
-  // there is operation on it. Then we reset the session_ and call again the
-  // handler
-  // method to accept a new connection.
+  // until there is operation on it. Then we reset the session_ and call again
+  // the handler method to accept a new connection.
   void handler() {
     acceptor_.async_accept(
         session_->socket(), session_->service().get_strand().wrap([this](
@@ -846,9 +841,11 @@ template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  const T& message) {
   core::Service service;
+
+  auto session = network::Stream::new_session(service);
+
   std::size_t bytes = 0;
   std::string protobuf("");
-  auto session = network::Stream::new_session(service);
 
   try {
     session->service().run();
@@ -881,6 +878,7 @@ T receive(const std::string& port) {
   } catch (std::exception& e) {
     core::Error::print(e.what());
   }
+
   T result;
   result.ParseFromString(received);
   return result;

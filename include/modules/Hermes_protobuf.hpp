@@ -548,9 +548,11 @@ template <typename T>
 std::size_t send(const std::string& host, const std::string& port,
                  const T& message) {
   core::Service service;
+
+  auto session = network::Stream::new_session(service);
+
   std::size_t bytes = 0;
   std::string protobuf("");
-  auto session = network::Stream::new_session(service);
 
   try {
     session->service().run();
@@ -583,6 +585,7 @@ T receive(const std::string& port) {
   } catch (std::exception& e) {
     core::Error::print(e.what());
   }
+
   T result;
   result.ParseFromString(received);
   return result;
