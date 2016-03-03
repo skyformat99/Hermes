@@ -867,7 +867,6 @@ std::size_t send(const std::string& host, const std::string& port,
 // message is constructed from a serialized string.
 template <typename T>
 T receive(const std::string& port) {
-  T result;
   core::Service service;
   std::string received("");
   auto session = network::Stream::new_session(service);
@@ -879,10 +878,11 @@ T receive(const std::string& port) {
     acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
     acceptor.accept(session->socket());
     received = session->receive();
-    result.ParseFromString(received);
   } catch (std::exception& e) {
     core::Error::print(e.what());
   }
+  T result;
+  result.ParseFromString(received);
   return result;
 }
 
