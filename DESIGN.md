@@ -356,6 +356,7 @@ coming soon.
 
   - Hermes_protobuf.hpp
   - Hermes_tcp_client.hpp
+  - Hermes_tcp_server.hpp
   - more soon.
 
 
